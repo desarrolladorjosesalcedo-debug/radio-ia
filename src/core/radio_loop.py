@@ -27,6 +27,7 @@ from typing import Optional
 # Importar módulos del proyecto
 from core.topics import get_random_topic
 from core.prompt import build_prompt, build_intro_prompt
+from core.session_history import SessionHistory
 from llm.ollama_client import generate_text, check_ollama_available
 from llm.groq_client import generate_text_groq, check_groq_available
 from tts.piper_tts import synthesize_speech, check_piper_available, validate_model
@@ -90,6 +91,7 @@ def load_config() -> dict:
             "llm_timeout": settings.get("llm", {}).get("timeout", 30),
             "api_key": settings.get("llm", {}).get("api_key", ""),
             "max_tokens": settings.get("llm", {}).get("max_tokens", 500),
+            "history_dir": settings.get("history", {}).get("dir", "history"),
         }
         
         logger.info(f"✅ Configuración cargada desde {settings_path}")
@@ -162,7 +164,7 @@ def generate_segment(
     max_tokens: int = 500,
     llm_timeout: int = 30,
     edge_voice: str = "es-CO-SalomeNeural"
-) -> tuple[str, bytes]:
+) -> tuple[str, bytes, str, str]:
     """
     Genera un segmento completo de radio (texto + audio).
     
@@ -173,7 +175,7 @@ def generate_segment(
         topic (Optional[str]): Tema específico, o None para aleatorio
     
     Returns:
-        tuple[str, bytes]: (texto_generado, audio_bytes)
+        tuple[str, bytes, str, str]: (texto_generado, audio_bytes, topic, tts_provider)
     """
     # Paso 1: Elegir tema
     if topic is None:
@@ -194,40 +196,46 @@ def generate_segment(
     
     if not texto or len(texto.strip()) < 10:
         logger.warning("⚠️  Texto generado inválido o vacío")
-        return "", b""
+        return "", b"", topic, "none"
     
     logger.info(f"✅ Texto generado ({len(texto)} caracteres)")
     
     # Paso 4: Convertir texto a voz (Piper → Edge TTS → Google TTS)
     logger.info("🎤 Sintetizando voz...")
     audio = synthesize_speech(texto, model_path, length_scale=duration_seconds/20.0)
+    tts_provider = "piper"
     
     # Si Piper falla, intentar con Edge TTS (mejor calidad)
     if not audio or len(audio) < 100:
         logger.warning("⚠️  Piper falló, intentando con Edge TTS...")
         audio = synthesize_speech_edge(texto, voice=edge_voice)
+        tts_provider = "edge"
     
     # Si Edge TTS falla, usar Google TTS como último recurso
     if not audio or len(audio) < 100:
         logger.warning("⚠️  Edge TTS falló, usando Google TTS...")
         audio = synthesize_speech_gtts(texto)
+        tts_provider = "gtts"
     
     if not audio or len(audio) < 100:
         logger.warning("⚠️  Audio generado inválido o vacío")
-        return texto, b""
+        return texto, b"", topic, "none"
     
     logger.info(f"✅ Audio sintetizado ({len(audio)} bytes)")
     
-    return texto, audio
+    return texto, audio, topic, tts_provider
 
 
-def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key: str = "", max_tokens: int = 200, edge_voice: str = "es-CO-SalomeNeural") -> None:
+def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key: str = "", max_tokens: int = 200, edge_voice: str = "es-CO-SalomeNeural") -> Optional[str]:
     """
     Reproduce una introducción de bienvenida a la radio.
     
     Args:
         model_name (str): Nombre del modelo de Ollama
         model_path (str): Ruta al modelo de Piper
+    
+    Returns:
+        Optional[str]: Texto de la introducción generada, o None si falla
     """
     logger.info("🎙️  Generando introducción de Radio IA...")
     
@@ -253,11 +261,13 @@ def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key
             if intro_audio:
                 play_audio(intro_audio)
                 logger.info("✅ Introducción reproducida")
-                return
+                return intro_text
         
         logger.warning("⚠️  No se pudo generar la introducción")
+        return None
     except Exception as e:
         logger.error(f"❌ Error generando introducción: {e}")
+        return None
 
 
 def start_radio(
@@ -318,9 +328,18 @@ def start_radio(
     logger.info(f"🔊 Sample rate: {sample_rate} Hz")
     logger.info("=" * 60)
     
+    # Inicializar historial de sesión
+    history_dir = config.get("history_dir", "history")
+    session_history = SessionHistory(history_dir)
+    session_id = session_history.start_session()
+    logger.info(f"📝 Sesión iniciada: {session_id}")
+    logger.info("=" * 60)
+    
     # Reproducir introducción
     if not skip_intro:
-        play_intro(model_name, model_path, provider=provider, api_key=api_key, max_tokens=200, edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"))
+        intro_text = play_intro(model_name, model_path, provider=provider, api_key=api_key, max_tokens=200, edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"))
+        if intro_text:
+            session_history.add_intro(intro_text, config.get("edge_voice", "es-CO-SalomeNeural"), 15.0)
         time.sleep(delay_seconds)
     
     # Iniciar bucle principal
@@ -345,7 +364,7 @@ def start_radio(
             logger.info(f"{'=' * 60}")
             
             # Generar segmento completo
-            texto, audio = generate_segment(
+            texto, audio, topic, tts_provider = generate_segment(
                 model_name=model_name,
                 model_path=model_path,
                 duration_seconds=duration_seconds,
@@ -386,6 +405,15 @@ def start_radio(
             logger.info("🔊 Reproduciendo segmento...")
             play_audio(audio, sample_rate=sample_rate)
             
+            # Guardar segmento en historial
+            session_history.add_segment(
+                topic=topic,
+                text=texto,
+                voice=config.get("edge_voice", "es-CO-SalomeNeural"),
+                duration=duration_seconds,
+                tts_provider=tts_provider
+            )
+            
             logger.info(f"✅ Segmento #{iteration} completado exitosamente")
             
             # Pausa antes del siguiente segmento
@@ -397,6 +425,8 @@ def start_radio(
             logger.info("\n" + "=" * 60)
             logger.info("⏹️  Interrupción recibida (Ctrl+C)")
             logger.info("🎙️  Deteniendo Radio IA...")
+            session_history.end_session()
+            logger.info(f"💾 Sesión guardada: {session_id}")
             logger.info("=" * 60)
             break
         
@@ -411,10 +441,17 @@ def start_radio(
             logger.info("⏸️  Esperando 2 segundos antes de reintentar...")
             time.sleep(2)
     
+    # Asegurar que se guarde la sesión al finalizar
+    session_history.end_session()
+    
     logger.info("\n" + "=" * 60)
     logger.info(f"📊 ESTADÍSTICAS FINALES")
+    logger.info(f"   Sesión ID: {session_id}")
     logger.info(f"   Segmentos generados: {iteration}")
     logger.info(f"   Errores consecutivos: {consecutive_errors}")
+    logger.info("=" * 60)
+    logger.info("💾 Para ver el historial: python src/main.py --list-sessions")
+    logger.info(f"💾 Para reproducir esta sesión: python src/main.py --replay {session_id}")
     logger.info("=" * 60)
     logger.info("👋 Gracias por escuchar Radio IA")
     logger.info("=" * 60)

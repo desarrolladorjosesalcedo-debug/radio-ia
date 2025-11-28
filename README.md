@@ -9,6 +9,8 @@ Radio IA es una aplicación que genera y transmite contenido de radio de forma c
 - 🤖 **Contenido generado por IA**: Groq API (ultra-rápido) o Ollama (local)
 - 🎙️ **Voz neuronal natural**: Microsoft Edge TTS con voces profesionales en español
 - 📻 **Transmisión continua**: Genera y reproduce contenido sin parar
+- 📝 **Historial de sesiones**: Guarda todo automáticamente en JSON con timestamps
+- 🔁 **Replay sin pausas**: Reproduce sesiones completas sin tiempos de generación
 - 🎨 **Múltiples temas**: Programación, tecnología, chistes, reflexiones, y más
 - ⚙️ **Altamente configurable**: Personaliza duración, tono, estilo y temas
 - 🌎 **8 voces en español**: México, Colombia, España, Argentina
@@ -143,18 +145,46 @@ personality:
 
 ## 🎯 Uso
 
+### Iniciar radio en vivo
 ```powershell
 # Windows
 .\scripts\run.ps1
 # o directamente:
 python src/main.py
 
-# Linux/Mac
-python3 src/main.py
+# Sin introducción
+python src/main.py --skip-intro
+
+# Con pausa personalizada (3 segundos entre segmentos)
+python src/main.py --delay 3.0
 ```
 
+### Gestión de historial de sesiones
+
+Cada vez que escuchas la radio, se guarda automáticamente en `history/`:
+
+```powershell
+# Ver todas las sesiones guardadas
+python src/main.py --list-sessions
+
+# Ver texto completo de una sesión
+python src/main.py --show 20251128_143000
+
+# Reproducir una sesión sin pausas (solo 2s entre segmentos)
+python src/main.py --replay 20251128_143000
+
+# Reproducir con delay personalizado
+python src/main.py --replay 20251128_143000 --delay 1.0
+```
+
+**Ventajas del replay:**
+- ✅ Sin pausas de generación (audio instantáneo)
+- ✅ Texto guardado para referencia
+- ✅ Puedes volver a escuchar tus sesiones favoritas
+- ✅ Perfecto para compartir contenido específico
+
 ### Detener la radio:
-Presiona `Ctrl+C` para detener la transmisión de forma elegante.
+Presiona `Ctrl+C` para detener la transmisión de forma elegante. La sesión se guardará automáticamente.
 
 ## 📁 Estructura del Proyecto
 
@@ -239,12 +269,14 @@ Contribuciones bienvenidas:
 
 ## 📝 TODO
 
+- [x] Sistema de historial de sesiones
+- [x] Replay de sesiones sin pausas
 - [ ] Más voces latinoamericanas (Chile, Perú, Venezuela)
 - [ ] Efectos de sonido entre segmentos
 - [ ] Música de fondo con crossfade
 - [ ] Web UI para control en tiempo real
 - [ ] Streaming a servidor Icecast/Shoutcast
-- [ ] Modo podcast (grabación de sesiones)
+- [ ] Exportar sesiones a MP3/podcast
 
 ## 📄 Licencia
 

@@ -52,6 +52,10 @@ models/piper/*.onnx.json
 temp_*.mp3
 temp_*.wav
 
+# Historial de sesiones
+history/
+*.json
+
 # API keys y variables de entorno
 .env
 config/env.local
