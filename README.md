@@ -39,8 +39,10 @@ Radio IA es una aplicación que genera y transmite contenido de radio de forma c
 4. **FFmpeg** - [Descargar](https://ffmpeg.org/download.html)
 
 ### Modelo de voz:
-- Descarga un modelo de voz de Piper desde [releases](https://github.com/rhasspy/piper/releases)
-- Recomendado para español: `es_ES-davefx-medium.onnx`
+- **IMPORTANTE**: Los modelos de Piper NO están incluidos en el repositorio por su tamaño
+- Descarga el modelo de voz español desde: [Piper Releases](https://github.com/rhasspy/piper/releases)
+- Recomendado: `es_ES-davefx-medium.onnx` (~63 MB)
+- Coloca los archivos `.onnx` y `.onnx.json` en `models/piper/`
 
 ## 🚀 Instalación
 
@@ -48,6 +50,7 @@ Radio IA es una aplicación que genera y transmite contenido de radio de forma c
 
 ```bash
 # Clonar el repositorio
+git clone https://github.com/desarrolladorjosesalcedo-debug/radio-ia.git
 cd radio-ia
 
 # Instalar dependencias
@@ -57,23 +60,36 @@ bash scripts/install_dependencies.sh
 ollama pull llama2
 
 # Descargar modelo de Piper y colocarlo en models/piper/
+# Desde: https://github.com/rhasspy/piper/releases/latest
+# Archivos: es_ES-davefx-medium.onnx y es_ES-davefx-medium.onnx.json
 ```
 
 ### Opción 2: Instalación manual (Windows)
 
 ```powershell
+# 0. Clonar el repositorio
+git clone https://github.com/desarrolladorjosesalcedo-debug/radio-ia.git
+cd radio-ia
+
 # 1. Crear y activar entorno virtual
 .\scripts\setup_venv.ps1
 
 # 2. Instalar herramientas externas
 .\scripts\install_dependencies.ps1
 
-# 3. Descargar modelo de Ollama
+# 3. Descargar modelo de Ollama (si usas Ollama)
 ollama pull llama2
 
-# 4. Descargar modelo de Piper y colocarlo en models/piper/
-# Desde: https://github.com/rhasspy/piper/releases
-# Recomendado: es_ES-davefx-medium.onnx
+# 4. Descargar modelo de Piper (OBLIGATORIO)
+# Desde: https://github.com/rhasspy/piper/releases/latest
+# Archivos necesarios:
+#   - es_ES-davefx-medium.onnx (~63 MB)
+#   - es_ES-davefx-medium.onnx.json (~4 KB)
+# Colocar en: models/piper/
+
+# 5. Configurar Groq API (opcional pero recomendado)
+# Editar config/settings.yaml con tu API key de Groq
+# Obtener API key gratis en: https://console.groq.com/
 ```
 
 **Nota**: Los scripts de PowerShell requieren permisos de ejecución. Si hay error, ejecuta:
