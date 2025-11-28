@@ -1,0 +1,15 @@
+# requirements.txt
+# Dependencias Python del proyecto Radio IA
+# Instalar con: pip install -r requirements.txt
+
+# Manejo de configuración YAML
+pyyaml>=6.0.1
+
+# API de Groq para LLM rápido
+groq>=0.4.0
+
+# Utilidades de sistema
+psutil>=5.9.0
+
+# Logging mejorado (opcional)
+colorlog>=6.7.0
