@@ -13,3 +13,7 @@ psutil>=5.9.0
 
 # Logging mejorado (opcional)
 colorlog>=6.7.0
+
+# Text-to-Speech (TTS)
+gtts>=2.5.0              # Google TTS (fallback)
+edge-tts>=7.0.0          # Microsoft Edge TTS (recomendado - voces neuronales)

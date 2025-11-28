@@ -30,6 +30,8 @@ from core.prompt import build_prompt, build_intro_prompt
 from llm.ollama_client import generate_text, check_ollama_available
 from llm.groq_client import generate_text_groq, check_groq_available
 from tts.piper_tts import synthesize_speech, check_piper_available, validate_model
+from tts.edge_tts_client import synthesize_speech_edge, check_edge_tts_available
+from tts.gtts_client import synthesize_speech_gtts, check_gtts_available
 from utils.audio_player import play_audio, check_ffplay_available
 
 # Configurar logging
@@ -84,6 +86,7 @@ def load_config() -> dict:
             "skip_intro": settings.get("radio", {}).get("skip_intro", False),
             "tts_speaker_id": settings.get("tts", {}).get("speaker_id"),
             "tts_length_scale": settings.get("tts", {}).get("length_scale", 1.0),
+            "edge_voice": settings.get("tts", {}).get("edge_voice", "es-CO-SalomeNeural"),
             "llm_timeout": settings.get("llm", {}).get("timeout", 30),
             "api_key": settings.get("llm", {}).get("api_key", ""),
             "max_tokens": settings.get("llm", {}).get("max_tokens", 500),
@@ -157,7 +160,8 @@ def generate_segment(
     provider: str = "groq",
     api_key: str = "",
     max_tokens: int = 500,
-    llm_timeout: int = 30
+    llm_timeout: int = 30,
+    edge_voice: str = "es-CO-SalomeNeural"
 ) -> tuple[str, bytes]:
     """
     Genera un segmento completo de radio (texto + audio).
@@ -194,9 +198,19 @@ def generate_segment(
     
     logger.info(f"✅ Texto generado ({len(texto)} caracteres)")
     
-    # Paso 4: Convertir texto a voz con Piper
-    logger.info("🎤 Sintetizando voz con Piper...")
+    # Paso 4: Convertir texto a voz (Piper → Edge TTS → Google TTS)
+    logger.info("🎤 Sintetizando voz...")
     audio = synthesize_speech(texto, model_path, length_scale=duration_seconds/20.0)
+    
+    # Si Piper falla, intentar con Edge TTS (mejor calidad)
+    if not audio or len(audio) < 100:
+        logger.warning("⚠️  Piper falló, intentando con Edge TTS...")
+        audio = synthesize_speech_edge(texto, voice=edge_voice)
+    
+    # Si Edge TTS falla, usar Google TTS como último recurso
+    if not audio or len(audio) < 100:
+        logger.warning("⚠️  Edge TTS falló, usando Google TTS...")
+        audio = synthesize_speech_gtts(texto)
     
     if not audio or len(audio) < 100:
         logger.warning("⚠️  Audio generado inválido o vacío")
@@ -207,7 +221,7 @@ def generate_segment(
     return texto, audio
 
 
-def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key: str = "", max_tokens: int = 200) -> None:
+def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key: str = "", max_tokens: int = 200, edge_voice: str = "es-CO-SalomeNeural") -> None:
     """
     Reproduce una introducción de bienvenida a la radio.
     
@@ -227,6 +241,15 @@ def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key
         
         if intro_text:
             intro_audio = synthesize_speech(intro_text, model_path)
+            # Si Piper falla, intentar con Edge TTS
+            if not intro_audio or len(intro_audio) < 100:
+                logger.warning("⚠️  Piper falló, usando Edge TTS para intro...")
+                intro_audio = synthesize_speech_edge(intro_text, voice=edge_voice)
+            # Si Edge TTS falla, usar Google TTS
+            if not intro_audio or len(intro_audio) < 100:
+                logger.warning("⚠️  Edge TTS falló, usando Google TTS para intro...")
+                intro_audio = synthesize_speech_gtts(intro_text)
+            
             if intro_audio:
                 play_audio(intro_audio)
                 logger.info("✅ Introducción reproducida")
@@ -297,7 +320,7 @@ def start_radio(
     
     # Reproducir introducción
     if not skip_intro:
-        play_intro(model_name, model_path, provider=provider, api_key=api_key, max_tokens=200)
+        play_intro(model_name, model_path, provider=provider, api_key=api_key, max_tokens=200, edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"))
         time.sleep(delay_seconds)
     
     # Iniciar bucle principal
@@ -329,7 +352,8 @@ def start_radio(
                 provider=provider,
                 api_key=api_key,
                 max_tokens=max_tokens,
-                llm_timeout=config.get("llm_timeout", 30)
+                llm_timeout=config.get("llm_timeout", 30),
+                edge_voice=config.get("edge_voice", "es-CO-SalomeNeural")
             )
             
             # Validar que se generó contenido
