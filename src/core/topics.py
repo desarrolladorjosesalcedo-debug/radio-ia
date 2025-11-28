@@ -36,17 +36,17 @@ DEFAULT_TOPICS = [
     "desarrollo web actual",
     "productividad personal",
     "desarrollo personal y mentalidad",
-    "historias motivacionales",
-    "noticias tecnológicas recientes",
-    "curiosidades del mundo digital",
-    "un chiste ligero para relajar",
-    "tendencias en inteligencia artificial",
-    "reflexiones breves sobre la vida",
-    "consejos de programación",
-    "herramientas útiles para desarrolladores",
-    "anécdotas del mundo tech",
-    "datos curiosos de ciencia",
-    "tips de carrera profesional"
+    "historias motivacionales"
+    # "noticias tecnológicas recientes",
+    # "curiosidades del mundo digital",
+    # "un chiste ligero para relajar",
+    # "tendencias en inteligencia artificial",
+    # "reflexiones breves sobre la vida",
+    # "consejos de programación",
+    # "herramientas útiles para desarrolladores",
+    # "anécdotas del mundo tech",
+    # "datos curiosos de ciencia",
+    # "tips de carrera profesional"
 ]
 
 

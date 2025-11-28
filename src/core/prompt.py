@@ -288,3 +288,79 @@ def get_personality_preset(preset_name: str) -> dict:
     preset = PERSONALITY_PRESETS.get(preset_name, PERSONALITY_PRESETS["standard"])
     logger.info(f"🎭 Usando personalidad '{preset_name}': {preset['description']}")
     return preset
+
+
+def build_monologue_prompt(
+    theme: str,
+    previous_content: Optional[str] = None,
+    duration_seconds: int = 20
+) -> str:
+    """
+    Construye un prompt para generar monólogos profundos y autoexpandidos.
+    El monólogo explora un tema en profundidad, genera preguntas y las responde,
+    creando un flujo continuo de exploración intelectual.
+    
+    Args:
+        theme (str): Tema central del monólogo
+        previous_content (Optional[str]): Contenido previo para continuidad
+        duration_seconds (int): Duración aproximada del segmento
+    
+    Returns:
+        str: Prompt completo para generar el monólogo
+    """
+    theme_clean = theme.strip()
+    
+    if not theme_clean:
+        logger.warning("⚠️  Tema vacío, usando tema por defecto")
+        theme_clean = "el conocimiento humano"
+    
+    logger.info(f"🧠 Construyendo monólogo sobre: '{theme_clean}' ({duration_seconds}s)")
+    
+    # Prompt base para monólogos autoexpandidos
+    base_monologue = f"""
+Eres un experto filósofo y divulgador que explora temas en profundidad.
+
+Tema central: {theme_clean}
+
+ESTRUCTURA DEL MONÓLOGO:
+1. Explora diferentes aspectos y perspectivas del tema
+2. Plantea preguntas que una persona curiosa haría (integradas naturalmente en el discurso)
+3. Responde esas preguntas con profundidad y claridad
+4. Conecta ideas de forma orgánica
+5. Genera nuevas reflexiones que expanden el tema
+
+ESTILO:
+- Natural y conversacional, como una charla informal pero inteligente
+- Profundo pero accesible, evita jerga académica excesiva
+- Usa ejemplos concretos, analogías y metáforas
+- Fluye como un monólogo continuo, NO uses formato de pregunta-respuesta explícito
+- Las preguntas deben estar integradas naturalmente: "Ahora bien, cabría preguntarse...", "Lo interesante aquí es..."
+- Mantén un tono reflexivo pero dinámico
+
+IMPORTANTE:
+- NO uses formato markdown ni asteriscos
+- NO hagas preguntas directas al oyente
+- NO uses frases como "¿Sabías que...?" al inicio
+- Duración aproximada: {duration_seconds} segundos de habla
+- Continúa expandiendo el tema sin repetirte"""
+    
+    # Si hay contenido previo, agregar contexto de continuidad
+    if previous_content:
+        continuity_section = f"""
+
+CONTEXTO PREVIO (último segmento):
+{previous_content[-300:]}  # Últimos 300 caracteres para contexto
+
+Continúa expandiendo el tema desde donde quedó el segmento anterior.
+NO repitas ideas ya mencionadas. Profundiza en nuevos aspectos o preguntas derivadas."""
+        base_monologue += continuity_section
+    
+    # Instrucción final
+    base_monologue += """
+
+Comienza tu monólogo ahora (habla directamente, sin introducción):
+"""
+    
+    prompt = base_monologue.strip()
+    logger.info(f"✅ Prompt de monólogo construido ({len(prompt)} caracteres)")
+    return prompt

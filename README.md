@@ -73,9 +73,16 @@ winget install -e --id Gyan.FFmpeg
 # Edita config/settings.yaml y agrega tu API key de Groq
 # Obtén una gratis en: https://console.groq.com/
 
-# 5. Ejecutar la radio
+# 5. Activar entorno (IMPORTANTE: ejecutar en cada sesión nueva)
+.\activate.ps1
+
+# 6. Ejecutar la radio
+python src/main.py
+# o usar el script:
 .\scripts\run.ps1
 ```
+
+**💡 Nota importante para Windows:** Si `python src/main.py` no funciona, usa `.\activate.ps1` primero. Este script configura el PATH correctamente para que FFmpeg y Python funcionen.
 
 ### Instalación alternativa (Linux/Mac)
 

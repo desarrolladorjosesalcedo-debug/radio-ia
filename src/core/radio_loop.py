@@ -21,8 +21,9 @@ import time
 import logging
 import sys
 import yaml
+import threading
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 # Importar módulos del proyecto
 from core.topics import get_random_topic
@@ -85,6 +86,8 @@ def load_config() -> dict:
             "sample_rate": settings.get("audio", {}).get("sample_rate", DEFAULT_CONFIG["sample_rate"]),
             "max_retries": settings.get("radio", {}).get("max_retries", DEFAULT_CONFIG["max_retries"]),
             "skip_intro": settings.get("radio", {}).get("skip_intro", False),
+            "mode": settings.get("radio", {}).get("mode", "topics"),
+            "monologue_theme": settings.get("radio", {}).get("monologue_theme", "inteligencia artificial"),
             "tts_speaker_id": settings.get("tts", {}).get("speaker_id"),
             "tts_length_scale": settings.get("tts", {}).get("length_scale", 1.0),
             "edge_voice": settings.get("tts", {}).get("edge_voice", "es-CO-SalomeNeural"),
@@ -163,7 +166,9 @@ def generate_segment(
     api_key: str = "",
     max_tokens: int = 500,
     llm_timeout: int = 30,
-    edge_voice: str = "es-CO-SalomeNeural"
+    edge_voice: str = "es-CO-SalomeNeural",
+    mode: str = "topics",
+    previous_content: Optional[str] = None
 ) -> tuple[str, bytes, str, str]:
     """
     Genera un segmento completo de radio (texto + audio).
@@ -173,18 +178,27 @@ def generate_segment(
         model_path (str): Ruta al modelo de Piper
         duration_seconds (int): Duración aproximada del segmento
         topic (Optional[str]): Tema específico, o None para aleatorio
+        mode (str): "topics" o "monologue"
+        previous_content (Optional[str]): Contenido previo para modo monólogo
     
     Returns:
         tuple[str, bytes, str, str]: (texto_generado, audio_bytes, topic, tts_provider)
     """
-    # Paso 1: Elegir tema
+    # Importar build_monologue_prompt
+    from core.prompt import build_monologue_prompt
+    
+    # Paso 1: Elegir tema o usar tema de monólogo
     if topic is None:
         topic = get_random_topic()
     logger.info(f"🎯 Tema seleccionado: '{topic}'")
     
-    # Paso 2: Construir prompt
-    prompt = build_prompt(topic, duration_seconds=duration_seconds)
-    logger.info("📝 Prompt construido")
+    # Paso 2: Construir prompt según modo
+    if mode == "monologue":
+        prompt = build_monologue_prompt(topic, previous_content=previous_content, duration_seconds=duration_seconds)
+        logger.info("🧠 Prompt de monólogo construido")
+    else:
+        prompt = build_prompt(topic, duration_seconds=duration_seconds)
+        logger.info("📝 Prompt construido")
     
     # Paso 3: Generar texto con LLM (Groq u Ollama)
     logger.info(f"🤖 Generando texto con {provider.upper()}...")
@@ -313,6 +327,8 @@ def start_radio(
     max_retries = config["max_retries"]
     api_key = config.get("api_key", "")
     max_tokens = config.get("max_tokens", 500)
+    mode = config.get("mode", "topics")
+    monologue_theme = config.get("monologue_theme", "inteligencia artificial")
     
     # Validar modelo de Piper
     if not Path(model_path).exists():
@@ -324,6 +340,9 @@ def start_radio(
     logger.info(f"🌐 Proveedor LLM: {provider.upper()}")
     logger.info(f"🤖 Modelo LLM: {model_name}")
     logger.info(f"🎤 Modelo TTS: {model_path}")
+    logger.info(f"🎭 Modo: {mode.upper()}")
+    if mode == "monologue":
+        logger.info(f"🧠 Tema del monólogo: {monologue_theme}")
     logger.info(f"⏱️  Duración por segmento: {duration_seconds}s")
     logger.info(f"🔊 Sample rate: {sample_rate} Hz")
     logger.info("=" * 60)
@@ -349,6 +368,30 @@ def start_radio(
     
     iteration = 0
     consecutive_errors = 0
+    previous_content = None  # Para modo monólogo
+    
+    # Variables para generación en paralelo
+    next_segment = None  # (texto, audio, topic, tts_provider)
+    generation_thread = None
+    
+    def generate_next_segment(prev_content=None):
+        """Genera el siguiente segmento en segundo plano"""
+        # En modo monólogo, siempre usar el tema configurado
+        segment_topic = monologue_theme if mode == "monologue" else None
+        
+        return generate_segment(
+            model_name=model_name,
+            model_path=model_path,
+            duration_seconds=duration_seconds,
+            topic=segment_topic,
+            provider=provider,
+            api_key=api_key,
+            max_tokens=max_tokens,
+            llm_timeout=config.get("llm_timeout", 30),
+            edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"),
+            mode=mode,
+            previous_content=prev_content
+        )
     
     while True:
         try:
@@ -363,17 +406,30 @@ def start_radio(
             logger.info(f"📻 SEGMENTO #{iteration}")
             logger.info(f"{'=' * 60}")
             
-            # Generar segmento completo
-            texto, audio, topic, tts_provider = generate_segment(
-                model_name=model_name,
-                model_path=model_path,
-                duration_seconds=duration_seconds,
-                provider=provider,
-                api_key=api_key,
-                max_tokens=max_tokens,
-                llm_timeout=config.get("llm_timeout", 30),
-                edge_voice=config.get("edge_voice", "es-CO-SalomeNeural")
-            )
+            # Si hay un segmento pre-generado, usarlo
+            if next_segment is not None and generation_thread is not None:
+                logger.info("⚡ Usando segmento pre-generado (sin espera)")
+                generation_thread.join()  # Esperar a que termine si aún no lo hizo
+                texto, audio, topic, tts_provider = next_segment
+                next_segment = None
+            else:
+                # Primera iteración: generar normalmente
+                # En modo monólogo, siempre usar el tema configurado
+                segment_topic = monologue_theme if mode == "monologue" else None
+                
+                texto, audio, topic, tts_provider = generate_segment(
+                    model_name=model_name,
+                    model_path=model_path,
+                    duration_seconds=duration_seconds,
+                    topic=segment_topic,
+                    provider=provider,
+                    api_key=api_key,
+                    max_tokens=max_tokens,
+                    llm_timeout=config.get("llm_timeout", 30),
+                    edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"),
+                    mode=mode,
+                    previous_content=previous_content
+                )
             
             # Validar que se generó contenido
             if not texto:
@@ -401,7 +457,25 @@ def start_radio(
             # Resetear contador de errores si todo salió bien
             consecutive_errors = 0
             
-            # Reproducir audio
+            # INICIAR GENERACIÓN DEL SIGUIENTE SEGMENTO EN PARALELO
+            # Mientras se reproduce el actual, generar el siguiente
+            if max_iterations is None or iteration < max_iterations:
+                logger.info("🔄 Generando siguiente segmento en segundo plano...")
+                
+                def generate_and_store():
+                    nonlocal next_segment
+                    try:
+                        # Pasar contenido previo solo en modo monólogo
+                        prev = previous_content if mode == "monologue" else None
+                        next_segment = generate_next_segment(prev_content=prev)
+                    except Exception as e:
+                        logger.error(f"❌ Error generando siguiente segmento: {e}")
+                        next_segment = None
+                
+                generation_thread = threading.Thread(target=generate_and_store, daemon=True)
+                generation_thread.start()
+            
+            # Reproducir audio (mientras el siguiente se genera en paralelo)
             logger.info("🔊 Reproduciendo segmento...")
             play_audio(audio, sample_rate=sample_rate)
             
@@ -414,11 +488,18 @@ def start_radio(
                 tts_provider=tts_provider
             )
             
+            # Actualizar contenido previo para modo monólogo
+            if mode == "monologue":
+                previous_content = texto
+            
             logger.info(f"✅ Segmento #{iteration} completado exitosamente")
             
-            # Pausa antes del siguiente segmento
+            # Pausa mínima (el siguiente segmento ya debería estar listo)
             if delay_seconds > 0:
-                logger.info(f"⏸️  Pausa de {delay_seconds}s antes del siguiente segmento...")
+                if generation_thread and generation_thread.is_alive():
+                    logger.info(f"⏳ Esperando que termine generación del siguiente segmento...")
+                else:
+                    logger.info(f"⚡ Siguiente segmento ya listo - sin pausa")
                 time.sleep(delay_seconds)
         
         except KeyboardInterrupt:
