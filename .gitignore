@@ -41,10 +41,16 @@ ENV/
 *.wav
 *.mp3
 *.raw
+*.ogg
+*.flac
 
 # Modelos pesados (Piper)
 models/piper/*.onnx
 models/piper/*.onnx.json
+
+# Archivos temporales de TTS
+temp_*.mp3
+temp_*.wav
 
 # API keys y variables de entorno
 .env
