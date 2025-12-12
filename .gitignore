@@ -56,6 +56,10 @@ temp_*.wav
 history/
 *.json
 
+# Archivos de texto personales (no subir contenido privado)
+input/*.txt
+!input/.gitkeep
+
 # API keys y variables de entorno
 .env
 config/env.local

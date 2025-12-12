@@ -293,7 +293,8 @@ def get_personality_preset(preset_name: str) -> dict:
 def build_monologue_prompt(
     theme: str,
     previous_content: Optional[str] = None,
-    duration_seconds: int = 20
+    duration_seconds: int = 20,
+    anti_repetition_context: str = ""
 ) -> str:
     """
     Construye un prompt para generar monólogos profundos y autoexpandidos.
@@ -316,33 +317,38 @@ def build_monologue_prompt(
     
     logger.info(f"🧠 Construyendo monólogo sobre: '{theme_clean}' ({duration_seconds}s)")
     
-    # Prompt base para monólogos autoexpandidos
+    # Prompt base para monólogos naturales y conversacionales
     base_monologue = f"""
-Eres un experto filósofo y divulgador que explora temas en profundidad.
+Eres un locutor de radio profesional hablando con tu audiencia sobre un tema interesante.
 
-Tema central: {theme_clean}
+Tema: {theme_clean}
 
-ESTRUCTURA DEL MONÓLOGO:
-1. Explora diferentes aspectos y perspectivas del tema
-2. Plantea preguntas que una persona curiosa haría (integradas naturalmente en el discurso)
-3. Responde esas preguntas con profundidad y claridad
-4. Conecta ideas de forma orgánica
-5. Genera nuevas reflexiones que expanden el tema
+REGLAS DE ESTILO (MUY IMPORTANTE):
+- Usa lenguaje SENCILLO Y NATURAL, como si hablaras con un amigo
+- Escribe como si estuvieras hablando en persona, NO leas un texto académico
+- EVITA frases filosóficas o académicas como "cabría preguntarse", "esto nos lleva a reflexionar", "cabe destacar"
+- NO repitas estructuras en cada frase
+- NO uses frases largas; marca respiraciones naturales con puntos
+- Añade variación: preguntas, ejemplos, comparaciones, pausas
+- Hazlo cálido, dinámico y CONVERSACIONAL
+- Suena como un locutor de radio hablando de manera NATURAL
 
-ESTILO:
-- Natural y conversacional, como una charla informal pero inteligente
-- Profundo pero accesible, evita jerga académica excesiva
-- Usa ejemplos concretos, analogías y metáforas
-- Fluye como un monólogo continuo, NO uses formato de pregunta-respuesta explícito
-- Las preguntas deben estar integradas naturalmente: "Ahora bien, cabría preguntarse...", "Lo interesante aquí es..."
-- Mantén un tono reflexivo pero dinámico
+ESTRUCTURA:
+- Explora el tema desde diferentes ángulos
+- Usa ejemplos concretos y situaciones reales
+- Conecta ideas de forma simple y directa
+- Si mencionas una pregunta, intégrala naturalmente: "Y te preguntarás...", "Quizás te estés preguntando...", "Ahora, lo interesante es..."
 
 IMPORTANTE:
 - NO uses formato markdown ni asteriscos
-- NO hagas preguntas directas al oyente
-- NO uses frases como "¿Sabías que...?" al inicio
+- NO hagas preguntas directas al oyente que requieran respuesta
 - Duración aproximada: {duration_seconds} segundos de habla
-- Continúa expandiendo el tema sin repetirte"""
+- Varía tu tono: a veces más animado, a veces más reflexivo
+- Habla CON la audiencia, no A la audiencia"""
+    
+    # Agregar contexto anti-repetición si existe
+    if anti_repetition_context:
+        base_monologue += anti_repetition_context
     
     # Si hay contenido previo, agregar contexto de continuidad
     if previous_content:

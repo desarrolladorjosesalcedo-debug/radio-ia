@@ -1,0 +1,603 @@
+================================================================================
+                    ESPECIFICACIONES TÉCNICAS - RADIO IA
+                        Sistema de Radio Automatizada con IA
+================================================================================
+
+VERSIÓN: 1.0
+FECHA: Diciembre 2025
+AUTOR: José Salcedo
+REPOSITORIO: https://github.com/desarrolladorjosesalcedo-debug/radio-ia
+
+================================================================================
+1. DESCRIPCIÓN GENERAL
+================================================================================
+
+Radio IA es un sistema completo de generación y transmisión de contenido de
+radio automatizado mediante inteligencia artificial. Genera contenido de texto
+con LLMs (Large Language Models) y lo convierte en voz con síntesis de alta
+calidad, creando una experiencia de radio continua e ininterrumpida.
+
+El sistema puede operar en tres modos distintos: temas variados, monólogos 
+profundos sobre un tema específico, o lectura de textos personalizados.
+
+================================================================================
+2. TECNOLOGÍAS Y LENGUAJES
+================================================================================
+
+LENGUAJE PRINCIPAL:
+  - Python 3.9+ (recomendado Python 3.11 o superior)
+  - Desarrollo orientado a objetos con arquitectura modular
+
+FRAMEWORKS Y LIBRERÍAS PYTHON:
+  - PyYAML 6.0.1+          → Gestión de configuración
+  - Groq 0.4.0+            → Cliente API para LLM
+  - edge-tts 7.0.0+        → Text-to-Speech con voces neuronales Microsoft
+  - gtts 2.5.0+            → Google TTS (sistema de respaldo)
+  - psutil 5.9.0+          → Utilidades del sistema
+  - colorlog 6.7.0+        → Logging mejorado con colores
+  - httpx                  → Cliente HTTP para APIs
+
+DEPENDENCIAS EXTERNAS:
+  - FFmpeg 8.0+            → Procesamiento y reproducción de audio
+  - ffplay                 → Reproductor de audio en línea de comandos
+
+APIs EXTERNAS:
+  - Groq API               → Generación de texto con LLM (llama-3.3-70b)
+  - Microsoft Edge TTS     → Síntesis de voz neuronal (8 voces en español)
+  - Ollama (opcional)      → Alternativa local para LLM
+
+SISTEMA OPERATIVO:
+  - Windows (PowerShell 5.1+)
+  - Linux (bash)
+  - macOS (zsh/bash)
+
+================================================================================
+3. FUNCIONALIDADES PRINCIPALES
+================================================================================
+
+3.1 GENERACIÓN DE CONTENIDO
+----------------------------
+✓ Generación automática de texto con LLM (Groq o Ollama)
+✓ 15 categorías de temas predefinidos (tecnología, ciencia, arte, etc.)
+✓ Construcción dinámica de prompts según contexto y personalidad
+✓ Segmentos de 15-30 segundos de duración (configurable)
+✓ Generación paralela en segundo plano (elimina tiempos de espera)
+✓ Sistema de anti-repetición con memoria de contenido previo
+
+3.2 MODOS DE OPERACIÓN
+-----------------------
+✓ MODO TOPICS: Genera contenido sobre temas variados aleatoriamente
+✓ MODO MONOLOGUE: Monólogo profundo y continuo sobre un tema específico
+  - Auto-expansión del tema con cada segmento
+  - Continuidad narrativa entre segmentos
+  - Sistema de memoria de contexto
+✓ MODO READER: Lee textos personalizados desde archivos
+  - División inteligente de texto por duración
+  - Estimación automática de tiempo de lectura
+  - Soporte para textos largos (ensayos, artículos)
+
+3.3 SÍNTESIS DE VOZ (TTS)
+--------------------------
+✓ Sistema de fallback multinivel:
+  1. Piper TTS (local, opcional)
+  2. Microsoft Edge TTS (principal, voces neuronales)
+  3. Google TTS (respaldo final)
+
+✓ 8 voces profesionales en español:
+  - Colombia: SalomeNeural (mujer), GonzaloNeural (hombre)
+  - México: DaliaNeural (mujer), JorgeNeural (hombre)
+  - España: ElviraNeural (mujer), AlvaroNeural (hombre)
+  - Argentina: ElenaNeural (mujer), TomasNeural (hombre)
+
+✓ Configuración avanzada:
+  - Velocidad de lectura ajustable (length_scale)
+  - Control de tono, volumen y velocidad
+  - Calidad neuronal de última generación
+
+3.4 REPRODUCCIÓN Y AUDIO
+-------------------------
+✓ Reproducción en tiempo real con FFplay
+✓ Transmisión continua sin interrupciones
+✓ Calidad de audio profesional (22050 Hz por defecto)
+✓ Generación paralela del siguiente segmento durante reproducción
+✓ Tiempo de espera entre segmentos: 0-2 segundos
+
+3.5 GESTIÓN DE SESIONES
+------------------------
+✓ Historial completo de todas las sesiones en formato JSON
+✓ Guardado automático con timestamp único (YYYYMMDD_HHMMSS)
+✓ Almacenamiento de:
+  - Texto completo de cada segmento
+  - Voz utilizada (nombre y provider)
+  - Duración de cada segmento
+  - Temas tratados
+  - Hora de inicio y fin
+
+✓ Sistema de sesión activa persistente:
+  - Continuación de sesiones previas (timeout 24h configurable)
+  - Memoria de últimos 5 segmentos
+  - Extracción de conceptos clave
+  - Anti-repetición de contenido ya cubierto
+
+✓ Funciones de replay:
+  - Reproducción sin pausas de generación
+  - Acceso instantáneo al contenido guardado
+  - Posibilidad de compartir sesiones específicas
+
+3.6 COMANDOS Y OPERACIÓN
+-------------------------
+✓ python src/main.py                    → Iniciar radio en vivo
+✓ python src/main.py --skip-intro       → Iniciar sin introducción
+✓ python src/main.py --delay 3.0        → Personalizar pausa entre segmentos
+✓ python src/main.py --list-sessions    → Ver historial de sesiones
+✓ python src/main.py --show SESSION_ID  → Ver texto de una sesión
+✓ python src/main.py --replay SESSION_ID → Reproducir sesión guardada
+✓ Ctrl+C                                 → Detener transmisión elegantemente
+
+3.7 SISTEMA DE CONFIGURACIÓN
+-----------------------------
+✓ Archivo YAML centralizado (config/settings.yaml)
+✓ Configuración de:
+  - Proveedor LLM (Groq/Ollama)
+  - Modelo de lenguaje
+  - API keys
+  - Voz TTS (selección de 8 voces)
+  - Duración de segmentos
+  - Pausas entre segmentos
+  - Modo de operación (topics/monologue/reader)
+  - Tema de monólogo
+  - Archivo de texto para modo reader
+  - Personalidad del locutor
+  - Nivel de energía
+  - Estilo narrativo
+  - Parámetros de sesión activa
+
+================================================================================
+4. ARQUITECTURA DEL SISTEMA
+================================================================================
+
+4.1 ESTRUCTURA DE DIRECTORIOS
+------------------------------
+radio-ia/
+├── src/                          # Código fuente principal
+│   ├── main.py                   # Punto de entrada
+│   ├── core/                     # Núcleo del sistema
+│   │   ├── radio_loop.py         # Orquestador principal (650 líneas)
+│   │   ├── topics.py             # Gestión de temas (15 categorías)
+│   │   ├── prompt.py             # Construcción dinámica de prompts
+│   │   ├── session_history.py   # Gestión de historial
+│   │   ├── replay.py             # Reproductor de sesiones
+│   │   ├── active_session.py    # Sesión persistente anti-repetición
+│   │   └── text_reader.py       # Lector de archivos de texto
+│   ├── llm/                      # Clientes de modelos de lenguaje
+│   │   ├── groq_client.py        # Cliente Groq API
+│   │   └── ollama_client.py      # Cliente Ollama local
+│   ├── tts/                      # Síntesis de voz
+│   │   ├── edge_tts_client.py    # Microsoft Edge TTS
+│   │   ├── gtts_client.py        # Google TTS
+│   │   └── piper_tts.py          # Piper TTS
+│   └── utils/                    # Utilidades
+│       └── audio_player.py       # Reproductor FFplay
+├── config/                       # Configuración
+│   └── settings.yaml             # Configuración principal
+├── history/                      # Historial de sesiones (JSON)
+│   └── active_session.json       # Sesión activa persistente
+├── input/                        # Archivos de entrada
+│   └── texto.txt                 # Textos para modo reader
+├── models/                       # Modelos locales (opcional)
+│   └── piper/                    # Modelos Piper TTS
+├── scripts/                      # Scripts de automatización
+│   ├── setup_venv.ps1            # Instalador Windows
+│   ├── run.ps1                   # Ejecutor Windows
+│   └── test_*.py                 # Scripts de prueba
+└── requirements.txt              # Dependencias Python
+
+4.2 FLUJO DE OPERACIÓN
+-----------------------
+
+[INICIO]
+   ↓
+[1. Cargar configuración] → settings.yaml
+   ↓
+[2. Verificar dependencias] → Groq API, FFmpeg, TTS
+   ↓
+[3. Inicializar gestores]
+   ├─ SessionHistory → Guardar todo
+   ├─ ActiveSessionManager → Anti-repetición
+   └─ Config → Parámetros operación
+   ↓
+[4. Verificar sesión activa]
+   ├─ Si existe y < 24h → CONTINUAR sesión
+   └─ Si no → CREAR nueva sesión
+   ↓
+[5. Generar introducción] (opcional)
+   ├─ Groq → Texto
+   ├─ Edge TTS → Audio
+   └─ FFplay → Reproducir
+   ↓
+[6. BUCLE PRINCIPAL] ↓↓↓
+   ├─ [Segmento N]
+   │   ├─ Seleccionar tema (topics) / usar tema (monologue) / cargar texto (reader)
+   │   ├─ Construir prompt (con anti-repetición si aplica)
+   │   ├─ Groq → Generar texto (1-2s)
+   │   ├─ Edge TTS → Sintetizar voz (2-3s)
+   │   ├─ [PARALELO] Generar siguiente segmento en background
+   │   ├─ FFplay → Reproducir audio actual
+   │   ├─ Guardar en SessionHistory
+   │   ├─ Actualizar ActiveSession (modo monologue)
+   │   └─ Delay configurable (0-3s)
+   │
+   ├─ [Segmento N+1] → Usar pre-generado (sin espera)
+   ├─ [Segmento N+2] → Usar pre-generado (sin espera)
+   └─ ... ∞
+   ↓
+[7. Ctrl+C detectado]
+   ↓
+[8. Guardar sesión] → history/SESSION_ID.json
+   ↓
+[9. Mostrar estadísticas]
+   ↓
+[FIN]
+
+4.3 COMPONENTES CLAVE
+----------------------
+
+▸ radio_loop.py (650 líneas)
+  - Orquestador principal del sistema
+  - Gestión del bucle infinito de transmisión
+  - Sistema de fallback multinivel para TTS
+  - Generación paralela con threading
+  - Manejo de errores y reintentos
+  - Integración de todos los módulos
+
+▸ active_session.py (261 líneas)
+  - Gestión de sesión persistente
+  - Sistema de timeout (24h por defecto)
+  - Memoria de últimos N segmentos (5 por defecto)
+  - Extracción de conceptos clave (NLP básico)
+  - Construcción de contexto anti-repetición
+  - Guardado automático en JSON
+
+▸ prompt.py
+  - Construcción dinámica de prompts para LLM
+  - Templates específicos por modo (topics/monologue/reader)
+  - Inyección de contexto anti-repetición
+  - Ajuste por duración de segmento
+  - Personalidad y estilo configurables
+
+▸ session_history.py
+  - CRUD completo de sesiones
+  - Formato JSON estructurado
+  - Timestamps automáticos
+  - Metadatos completos (voz, duración, tema)
+  - Sistema de consulta y filtrado
+
+▸ text_reader.py
+  - Carga de archivos de texto
+  - División inteligente por duración
+  - Estimación de tiempo de lectura
+  - Preservación de formato y puntuación
+  - Soporte para textos largos
+
+================================================================================
+5. REQUISITOS DEL SISTEMA
+================================================================================
+
+5.1 HARDWARE MÍNIMO
+--------------------
+✓ CPU: 2 cores @ 2.0 GHz o superior
+✓ RAM: 2 GB libres (4 GB recomendado)
+✓ Disco: 500 MB para instalación + espacio para historial
+✓ Conexión a internet: 512 Kbps mínimo (para APIs)
+✓ Tarjeta de sonido o salida de audio
+
+5.2 SOFTWARE REQUERIDO
+-----------------------
+✓ Python 3.9 o superior (recomendado 3.11+)
+  - Descargar: https://www.python.org/downloads/
+
+✓ FFmpeg 8.0 o superior (con ffplay incluido)
+  - Windows: https://www.gyan.dev/ffmpeg/builds/
+  - Linux: sudo apt install ffmpeg
+  - macOS: brew install ffmpeg
+
+✓ Pip (gestor de paquetes Python)
+  - Incluido con Python 3.4+
+
+✓ Git (para clonar repositorio)
+  - Descargar: https://git-scm.com/downloads
+
+5.3 CUENTAS Y ACCESOS
+----------------------
+✓ Groq API Key (RECOMENDADO - gratis)
+  - Registro: https://console.groq.com/
+  - Plan gratuito: 30 req/min, 6000 req/día
+  - Modelos: llama-3.3-70b-versatile, llama-3.1-8b-instant
+
+✓ Ollama (OPCIONAL - 100% local)
+  - Descarga: https://ollama.ai/
+  - No requiere internet después de descargar modelo
+  - Consumo: 4-8 GB RAM según modelo
+
+✓ Internet (para Edge TTS y Groq)
+  - Edge TTS: 100% gratuito, sin límites
+  - Sin internet: usar Piper TTS (local)
+
+5.4 CONFIGURACIÓN WINDOWS ESPECÍFICA
+-------------------------------------
+✓ PowerShell 5.1 o superior
+✓ Política de ejecución: RemoteSigned o superior
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+✓ PATH actualizado con:
+  - Python/Scripts
+  - FFmpeg/bin
+  - (automático con activate.ps1)
+
+================================================================================
+6. INSTALACIÓN PASO A PASO
+================================================================================
+
+6.1 WINDOWS (PowerShell)
+------------------------
+# 1. Clonar repositorio
+git clone https://github.com/desarrolladorjosesalcedo-debug/radio-ia.git
+cd radio-ia
+
+# 2. Crear entorno virtual
+python -m venv venv
+
+# 3. Activar entorno
+.\venv\Scripts\Activate.ps1
+
+# 4. Instalar dependencias
+pip install -r requirements.txt
+
+# 5. Instalar FFmpeg
+winget install -e --id Gyan.FFmpeg
+# O descargar manualmente desde: https://www.gyan.dev/ffmpeg/builds/
+
+# 6. Configurar Groq API
+# Editar config/settings.yaml
+# Agregar tu API key de: https://console.groq.com/
+
+# 7. Ejecutar
+python src/main.py
+
+6.2 LINUX/macOS
+---------------
+# 1. Clonar repositorio
+git clone https://github.com/desarrolladorjosesalcedo-debug/radio-ia.git
+cd radio-ia
+
+# 2. Crear entorno virtual
+python3 -m venv venv
+
+# 3. Activar entorno
+source venv/bin/activate
+
+# 4. Instalar dependencias
+pip install -r requirements.txt
+
+# 5. Instalar FFmpeg
+# Ubuntu/Debian: sudo apt install ffmpeg
+# macOS: brew install ffmpeg
+
+# 6. Configurar Groq API
+# Editar config/settings.yaml
+
+# 7. Ejecutar
+python src/main.py
+
+================================================================================
+7. CARACTERÍSTICAS AVANZADAS
+================================================================================
+
+7.1 SISTEMA ANTI-REPETICIÓN
+----------------------------
+✓ Memoria persistente de últimos 5 segmentos
+✓ Extracción automática de conceptos clave
+✓ Construcción de contexto para el LLM
+✓ Timeout de sesión configurable (24h default)
+✓ Inyección en prompts del LLM
+✓ Funciona solo en modo monologue
+
+7.2 GENERACIÓN PARALELA
+------------------------
+✓ Threading para generar siguiente segmento
+✓ Generación durante reproducción del actual
+✓ Elimina tiempos de espera entre segmentos
+✓ Seamless streaming experience
+✓ Manejo de errores en threads
+
+7.3 PERSONALIZACIÓN AVANZADA
+-----------------------------
+✓ 15 categorías de temas predefinidos
+✓ Sistema de personalidad del locutor
+✓ Niveles de energía (alto/medio/bajo/relajado)
+✓ Estilos narrativos (informativo/entretenido/reflexivo)
+✓ Presets de personalidad (standard/morning_show/night_talk/comedy)
+✓ Control fino de voz (tono, velocidad, volumen)
+
+7.4 MODO READER INTELIGENTE
+----------------------------
+✓ Carga archivos .txt personalizados
+✓ División automática por duración objetivo
+✓ Estimación de tiempo de lectura (200 caracteres ≈ 20s)
+✓ Preserva puntuación y formato
+✓ Ideal para ensayos, artículos, poemas
+
+================================================================================
+8. LIMITACIONES Y CONSIDERACIONES
+================================================================================
+
+8.1 LÍMITES TÉCNICOS
+---------------------
+✗ Groq API: 30 req/min (plan gratuito)
+✗ Edge TTS: Requiere conexión a internet
+✗ Generación: 1-2s por segmento (Groq), 3-5s (Ollama)
+✗ Síntesis: 2-3s por segmento
+✗ Memoria RAM: 2-8 GB según configuración
+
+8.2 DEPENDENCIAS EXTERNAS
+--------------------------
+✗ Requiere APIs externas (Groq, Edge TTS) para funcionamiento óptimo
+✗ FFmpeg necesario para reproducción
+✗ Python 3.9+ obligatorio
+✗ Internet recomendado (puede funcionar offline con Ollama + Piper)
+
+8.3 COMPATIBILIDAD
+-------------------
+✓ Windows 10/11 (PowerShell 5.1+)
+✓ Linux (Ubuntu 20.04+, Debian 11+)
+✓ macOS (10.15+)
+✗ No soporta: Windows 7, sistemas de 32 bits
+
+================================================================================
+9. RENDIMIENTO Y OPTIMIZACIÓN
+================================================================================
+
+9.1 TIEMPOS DE RESPUESTA
+-------------------------
+▸ Generación de texto (Groq): 1-2 segundos
+▸ Generación de texto (Ollama): 3-5 segundos
+▸ Síntesis de voz (Edge TTS): 2-3 segundos
+▸ Síntesis de voz (Piper): 1-2 segundos
+▸ Tiempo entre segmentos: 0-3 segundos (configurable)
+▸ Tiempo total por segmento: ~5-8 segundos
+
+9.2 OPTIMIZACIONES IMPLEMENTADAS
+---------------------------------
+✓ Generación paralela con threading
+✓ Caché de configuración
+✓ Fallback automático entre servicios TTS
+✓ Reintentos automáticos en caso de error
+✓ Logging eficiente con niveles
+
+9.3 CONSUMO DE RECURSOS
+------------------------
+▸ CPU: 10-30% durante generación
+▸ RAM: 200-500 MB (sin Ollama), 4-8 GB (con Ollama)
+▸ Red: ~50 KB/segmento (APIs), ~500 KB/segmento (audio)
+▸ Disco: ~2 MB por sesión de 10 minutos (historial JSON)
+
+================================================================================
+10. SEGURIDAD Y PRIVACIDAD
+================================================================================
+
+10.1 DATOS ENVIADOS A APIS
+---------------------------
+✓ Groq API: Solo prompts de texto (no datos personales)
+✓ Edge TTS: Solo texto a sintetizar (no datos personales)
+✓ No se envían: audio, historial, archivos locales
+
+10.2 ALMACENAMIENTO LOCAL
+--------------------------
+✓ Historial en JSON sin cifrar (text plain)
+✓ API keys en settings.yaml (proteger archivo)
+✓ No se almacenan datos sensibles del usuario
+
+10.3 RECOMENDACIONES
+--------------------
+✓ No compartir settings.yaml con API keys
+✓ Usar .gitignore para excluir config/settings.yaml
+✓ Revisar historial antes de compartir sesiones
+✓ API keys solo con permisos necesarios
+
+================================================================================
+11. CASOS DE USO
+================================================================================
+
+11.1 ENTRETENIMIENTO
+--------------------
+✓ Radio personal 24/7 con contenido variado
+✓ Compañía durante trabajo o estudio
+✓ Descubrimiento de temas aleatorios
+
+11.2 EDUCATIVO
+--------------
+✓ Aprendizaje de temas específicos (modo monologue)
+✓ Lectura de artículos y ensayos (modo reader)
+✓ Podcast personalizado sobre intereses
+
+11.3 CREACIÓN DE CONTENIDO
+---------------------------
+✓ Generación de guiones para videos
+✓ Ideas para contenido creativo
+✓ Podcast automatizado
+
+11.4 ACCESIBILIDAD
+------------------
+✓ Lectura de textos largos en voz alta
+✓ Alternativa a lectura visual
+✓ Contenido de audio bajo demanda
+
+================================================================================
+12. MANTENIMIENTO Y ACTUALIZACIÓN
+================================================================================
+
+12.1 ACTUALIZACIONES
+--------------------
+# Actualizar dependencias
+pip install --upgrade -r requirements.txt
+
+# Actualizar repositorio
+git pull origin master
+
+# Limpiar entorno virtual
+rm -rf venv
+python -m venv venv
+pip install -r requirements.txt
+
+12.2 LIMPIEZA DE HISTORIAL
+---------------------------
+# Limpiar sesiones antiguas (manual)
+cd history
+# Eliminar archivos .json antiguos
+
+# Limpiar sesión activa
+rm history/active_session.json
+
+12.3 LOGS Y DEBUG
+-----------------
+# Logs en consola con niveles:
+# - INFO: Operación normal
+# - WARNING: Advertencias no críticas
+# - ERROR: Errores recuperables
+# - CRITICAL: Errores fatales
+
+# Ajustar nivel de logging en src/core/radio_loop.py:
+logging.basicConfig(level=logging.DEBUG)
+
+================================================================================
+13. CONTACTO Y SOPORTE
+================================================================================
+
+REPOSITORIO: https://github.com/desarrolladorjosesalcedo-debug/radio-ia
+AUTOR: José Salcedo
+LICENCIA: MIT License
+
+ISSUES: Reportar bugs en GitHub Issues
+CONTRIBUCIONES: Pull requests bienvenidos
+DOCUMENTACIÓN: README.md en repositorio
+
+================================================================================
+14. HISTORIAL DE VERSIONES
+================================================================================
+
+v1.0 (Diciembre 2025)
+---------------------
+✓ Lanzamiento inicial
+✓ 3 modos de operación (topics/monologue/reader)
+✓ Sistema de sesiones con historial completo
+✓ Replay de sesiones sin pausas
+✓ Generación paralela (threading)
+✓ Sistema anti-repetición (sesión persistente)
+✓ 8 voces en español (Edge TTS)
+✓ Fallback TTS multinivel
+✓ Configuración completa via YAML
+✓ Scripts de automatización Windows
+
+================================================================================
+FIN DE ESPECIFICACIONES
+================================================================================

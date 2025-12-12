@@ -29,6 +29,8 @@ from typing import Optional, Tuple
 from core.topics import get_random_topic
 from core.prompt import build_prompt, build_intro_prompt
 from core.session_history import SessionHistory
+from core.active_session import ActiveSessionManager, build_anti_repetition_context
+from tts.tts_manager import get_tts_manager
 from llm.ollama_client import generate_text, check_ollama_available
 from llm.groq_client import generate_text_groq, check_groq_available
 from tts.piper_tts import synthesize_speech, check_piper_available, validate_model
@@ -88,6 +90,7 @@ def load_config() -> dict:
             "skip_intro": settings.get("radio", {}).get("skip_intro", False),
             "mode": settings.get("radio", {}).get("mode", "topics"),
             "monologue_theme": settings.get("radio", {}).get("monologue_theme", "inteligencia artificial"),
+            "reader_file": settings.get("radio", {}).get("reader_file", "input/texto.txt"),
             "tts_speaker_id": settings.get("tts", {}).get("speaker_id"),
             "tts_length_scale": settings.get("tts", {}).get("length_scale", 1.0),
             "edge_voice": settings.get("tts", {}).get("edge_voice", "es-CO-SalomeNeural"),
@@ -95,6 +98,9 @@ def load_config() -> dict:
             "api_key": settings.get("llm", {}).get("api_key", ""),
             "max_tokens": settings.get("llm", {}).get("max_tokens", 500),
             "history_dir": settings.get("history", {}).get("dir", "history"),
+            "continue_session": settings.get("history", {}).get("continue_session", True),
+            "session_timeout_hours": settings.get("history", {}).get("session_timeout_hours", 24),
+            "max_content_memory": settings.get("history", {}).get("max_content_memory", 5),
         }
         
         logger.info(f"✅ Configuración cargada desde {settings_path}")
@@ -168,7 +174,9 @@ def generate_segment(
     llm_timeout: int = 30,
     edge_voice: str = "es-CO-SalomeNeural",
     mode: str = "topics",
-    previous_content: Optional[str] = None
+    previous_content: Optional[str] = None,
+    reader_text: Optional[str] = None,
+    anti_repetition_context: str = ""
 ) -> tuple[str, bytes, str, str]:
     """
     Genera un segmento completo de radio (texto + audio).
@@ -178,8 +186,10 @@ def generate_segment(
         model_path (str): Ruta al modelo de Piper
         duration_seconds (int): Duración aproximada del segmento
         topic (Optional[str]): Tema específico, o None para aleatorio
-        mode (str): "topics" o "monologue"
+        mode (str): "topics", "monologue", o "reader"
         previous_content (Optional[str]): Contenido previo para modo monólogo
+        reader_text (Optional[str]): Texto a leer en modo reader
+        anti_repetition_context (str): Contexto de anti-repetición para evitar contenido ya cubierto
     
     Returns:
         tuple[str, bytes, str, str]: (texto_generado, audio_bytes, topic, tts_provider)
@@ -192,21 +202,36 @@ def generate_segment(
         topic = get_random_topic()
     logger.info(f"🎯 Tema seleccionado: '{topic}'")
     
-    # Paso 2: Construir prompt según modo
-    if mode == "monologue":
-        prompt = build_monologue_prompt(topic, previous_content=previous_content, duration_seconds=duration_seconds)
-        logger.info("🧠 Prompt de monólogo construido")
+    # Paso 2: Obtener texto según modo
+    if mode == "reader":
+        # Modo lector: usar texto proporcionado directamente
+        if not reader_text:
+            logger.error("❌ Modo reader pero no hay texto para leer")
+            return "", b"", "Sin texto", "none"
+        texto = reader_text
+        logger.info(f"📖 Usando texto del lector ({len(texto)} caracteres)")
     else:
-        prompt = build_prompt(topic, duration_seconds=duration_seconds)
-        logger.info("📝 Prompt construido")
-    
-    # Paso 3: Generar texto con LLM (Groq u Ollama)
-    logger.info(f"🤖 Generando texto con {provider.upper()}...")
-    
-    if provider == "groq":
-        texto = generate_text_groq(model_name, prompt, api_key, max_tokens=max_tokens)
-    else:  # ollama
-        texto = generate_text(model_name, prompt, timeout=llm_timeout)
+        # Modos topics y monologue: generar con LLM
+        # Paso 2: Construir prompt según modo
+        if mode == "monologue":
+            prompt = build_monologue_prompt(
+                topic, 
+                previous_content=previous_content, 
+                duration_seconds=duration_seconds,
+                anti_repetition_context=anti_repetition_context
+            )
+            logger.info("🧠 Prompt de monólogo construido")
+        else:
+            prompt = build_prompt(topic, duration_seconds=duration_seconds)
+            logger.info("📝 Prompt construido")
+        
+        # Paso 3: Generar texto con LLM (Groq u Ollama)
+        logger.info(f"🤖 Generando texto con {provider.upper()}...")
+        
+        if provider == "groq":
+            texto = generate_text_groq(model_name, prompt, api_key, max_tokens=max_tokens)
+        else:  # ollama
+            texto = generate_text(model_name, prompt, timeout=llm_timeout)
     
     if not texto or len(texto.strip()) < 10:
         logger.warning("⚠️  Texto generado inválido o vacío")
@@ -337,12 +362,34 @@ def start_radio(
         logger.info("   Modelos disponibles en: https://github.com/rhasspy/piper/releases")
         return
     
+    # Cargar segmentos en modo reader
+    reader_segments = None
+    reader_file = None
+    if mode == "reader":
+        from core.text_reader import load_and_split_text, validate_text_file
+        reader_file = config.get("reader_file", "input/texto.txt")
+        
+        if not validate_text_file(reader_file):
+            logger.error(f"❌ Archivo de texto inválido: {reader_file}")
+            logger.info("💡 Crea el archivo input/texto.txt con el contenido a leer")
+            return
+        
+        reader_segments = load_and_split_text(reader_file, duration_seconds)
+        if not reader_segments:
+            logger.error("❌ No se pudo procesar el archivo de texto")
+            return
+        
+        logger.info(f"📖 Texto cargado: {len(reader_segments)} segmentos")
+    
     logger.info(f"🌐 Proveedor LLM: {provider.upper()}")
     logger.info(f"🤖 Modelo LLM: {model_name}")
     logger.info(f"🎤 Modelo TTS: {model_path}")
     logger.info(f"🎭 Modo: {mode.upper()}")
     if mode == "monologue":
         logger.info(f"🧠 Tema del monólogo: {monologue_theme}")
+    elif mode == "reader":
+        logger.info(f"📖 Archivo: {reader_file}")
+        logger.info(f"📖 Segmentos: {len(reader_segments)}")
     logger.info(f"⏱️  Duración por segmento: {duration_seconds}s")
     logger.info(f"🔊 Sample rate: {sample_rate} Hz")
     logger.info("=" * 60)
@@ -352,6 +399,28 @@ def start_radio(
     session_history = SessionHistory(history_dir)
     session_id = session_history.start_session()
     logger.info(f"📝 Sesión iniciada: {session_id}")
+    
+    # Inicializar gestión de sesión activa (anti-repetición)
+    active_session_manager = ActiveSessionManager(
+        history_dir=history_dir,
+        timeout_hours=config.get("session_timeout_hours", 24)
+    )
+    
+    # Obtener o crear sesión activa
+    active_session_id, is_continuing, previous_session_content = active_session_manager.get_or_create_session()
+    
+    if config.get("continue_session", True) and is_continuing and mode == "monologue":
+        logger.info(f"♻️  Continuando sesión activa: {active_session_id}")
+        logger.info(f"📚 Contenido previo detectado: {len(previous_session_content)} caracteres")
+        anti_repetition_context = build_anti_repetition_context(previous_session_content)
+        logger.info(f"🚫 Contexto anti-repetición activado")
+    else:
+        if not is_continuing:
+            logger.info(f"🆕 Nueva sesión activa: {active_session_id}")
+        else:
+            logger.info(f"📝 Sesión {active_session_id} (modo {mode} - sin anti-repetición)")
+        anti_repetition_context = ""
+    
     logger.info("=" * 60)
     
     # Reproducir introducción
@@ -374,10 +443,16 @@ def start_radio(
     next_segment = None  # (texto, audio, topic, tts_provider)
     generation_thread = None
     
-    def generate_next_segment(prev_content=None):
+    def generate_next_segment(prev_content=None, segment_index=None, anti_rep_context=""):
         """Genera el siguiente segmento en segundo plano"""
         # En modo monólogo, siempre usar el tema configurado
         segment_topic = monologue_theme if mode == "monologue" else None
+        
+        # En modo reader, obtener el texto del segmento
+        segment_text = None
+        if mode == "reader" and segment_index is not None and reader_segments:
+            if segment_index < len(reader_segments):
+                segment_text = reader_segments[segment_index]
         
         return generate_segment(
             model_name=model_name,
@@ -390,7 +465,9 @@ def start_radio(
             llm_timeout=config.get("llm_timeout", 30),
             edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"),
             mode=mode,
-            previous_content=prev_content
+            previous_content=prev_content,
+            reader_text=segment_text,
+            anti_repetition_context=anti_rep_context
         )
     
     while True:
@@ -417,6 +494,15 @@ def start_radio(
                 # En modo monólogo, siempre usar el tema configurado
                 segment_topic = monologue_theme if mode == "monologue" else None
                 
+                # En modo reader, obtener el texto del segmento
+                segment_text = None
+                if mode == "reader" and reader_segments:
+                    if iteration - 1 < len(reader_segments):
+                        segment_text = reader_segments[iteration - 1]
+                    else:
+                        logger.info("✅ Todos los segmentos del texto han sido leídos")
+                        break
+                
                 texto, audio, topic, tts_provider = generate_segment(
                     model_name=model_name,
                     model_path=model_path,
@@ -428,7 +514,9 @@ def start_radio(
                     llm_timeout=config.get("llm_timeout", 30),
                     edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"),
                     mode=mode,
-                    previous_content=previous_content
+                    previous_content=previous_content,
+                    reader_text=segment_text,
+                    anti_repetition_context=anti_repetition_context
                 )
             
             # Validar que se generó contenido
@@ -459,7 +547,14 @@ def start_radio(
             
             # INICIAR GENERACIÓN DEL SIGUIENTE SEGMENTO EN PARALELO
             # Mientras se reproduce el actual, generar el siguiente
-            if max_iterations is None or iteration < max_iterations:
+            should_generate_next = True
+            if mode == "reader" and reader_segments:
+                # En modo reader, verificar si hay más segmentos
+                should_generate_next = iteration < len(reader_segments)
+            elif max_iterations is not None:
+                should_generate_next = iteration < max_iterations
+            
+            if should_generate_next:
                 logger.info("🔄 Generando siguiente segmento en segundo plano...")
                 
                 def generate_and_store():
@@ -467,7 +562,11 @@ def start_radio(
                     try:
                         # Pasar contenido previo solo en modo monólogo
                         prev = previous_content if mode == "monologue" else None
-                        next_segment = generate_next_segment(prev_content=prev)
+                        # En modo reader, pasar el índice del siguiente segmento
+                        seg_idx = iteration if mode == "reader" else None
+                        # Pasar contexto anti-repetición solo en modo monólogo
+                        anti_rep = anti_repetition_context if mode == "monologue" else ""
+                        next_segment = generate_next_segment(prev_content=prev, segment_index=seg_idx, anti_rep_context=anti_rep)
                     except Exception as e:
                         logger.error(f"❌ Error generando siguiente segmento: {e}")
                         next_segment = None
@@ -491,6 +590,8 @@ def start_radio(
             # Actualizar contenido previo para modo monólogo
             if mode == "monologue":
                 previous_content = texto
+                # Agregar contenido a sesión activa para anti-repetición
+                active_session_manager.add_content(active_session_id, texto, config.get("max_content_memory", 5))
             
             logger.info(f"✅ Segmento #{iteration} completado exitosamente")
             
