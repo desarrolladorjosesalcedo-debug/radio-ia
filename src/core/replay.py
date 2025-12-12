@@ -60,6 +60,11 @@ def replay_session(
     try:
         # Reproducir introducción si existe
         if session.get("intro"):
+            # Check de detención
+            if stop_flag and stop_flag.is_set():
+                logger.info("🛑 Reproducción detenida")
+                return False
+            
             logger.info("🎙️  Reproduciendo introducción...")
             intro_text = session["intro"]["text"]
             intro_audio = _synthesize_with_fallback(
@@ -75,6 +80,22 @@ def replay_session(
         
         # Reproducir cada segmento
         for i, segment in enumerate(session["segments"], 1):
+            # Check de detención
+            if stop_flag and stop_flag.is_set():
+                logger.info("🛑 Reproducción detenida")
+                return False
+            
+            # Check de pausa
+            if pause_flag:
+                while pause_flag.is_set():
+                    logger.info("⏸️  Reproducción en pausa...")
+                    time.sleep(0.5)
+                    # Verificar stop durante pausa
+                    if stop_flag and stop_flag.is_set():
+                        logger.info("🛑 Reproducción detenida durante pausa")
+                        return False
+                logger.info("▶️  Reproducción reanudada")
+            
             logger.info(f"\n{'=' * 60}")
             logger.info(f"📻 SEGMENTO #{i}: {segment['topic']}")
             logger.info(f"{'=' * 60}")

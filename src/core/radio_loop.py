@@ -37,6 +37,7 @@ from tts.piper_tts import synthesize_speech, check_piper_available, validate_mod
 from tts.edge_tts_client import synthesize_speech_edge, check_edge_tts_available
 from tts.gtts_client import synthesize_speech_gtts, check_gtts_available
 from utils.audio_player import play_audio, check_ffplay_available
+from utils.audio_output import output_audio
 
 # Configurar logging
 logging.basicConfig(
@@ -44,6 +45,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# ========== FLAGS DE CONTROL GLOBAL ==========
+# Estos flags permiten pausar/detener la radio desde threads externos (API web)
+_stop_flag = None
+_pause_flag = None
 
 
 # Configuración por defecto
@@ -312,7 +318,9 @@ def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key
 def start_radio(
     delay_seconds: float = 1.0,
     max_iterations: Optional[int] = None,
-    skip_intro: bool = False
+    skip_intro: bool = False,
+    stop_flag: Optional[threading.Event] = None,
+    pause_flag: Optional[threading.Event] = None
 ) -> None:
     """
     Inicia el bucle principal de Radio IA.
@@ -327,10 +335,17 @@ def start_radio(
         delay_seconds (float): Pausa entre segmentos en segundos (default: 1.0)
         max_iterations (Optional[int]): Número máximo de iteraciones (None = infinito)
         skip_intro (bool): Si True, omite la introducción (default: False)
+        stop_flag (Optional[threading.Event]): Flag para detener la radio externamente
+        pause_flag (Optional[threading.Event]): Flag para pausar la radio externamente
     
     Raises:
         KeyboardInterrupt: Cuando el usuario presiona Ctrl+C
     """
+    global _stop_flag, _pause_flag
+    
+    # Guardar referencias a los flags para acceso global
+    _stop_flag = stop_flag
+    _pause_flag = pause_flag
     logger.info("=" * 60)
     logger.info("🎙️  RADIO IA - INICIANDO TRANSMISIÓN")
     logger.info("=" * 60)
@@ -472,6 +487,24 @@ def start_radio(
     
     while True:
         try:
+            # Verificar flag de detención
+            if stop_flag and stop_flag.is_set():
+                logger.info("🛑 Señal de detención recibida")
+                break
+            
+            # Verificar flag de pausa
+            if pause_flag:
+                while pause_flag.is_set():
+                    logger.info("⏸️  Radio en pausa...")
+                    time.sleep(0.5)
+                    # También verificar stop durante la pausa
+                    if stop_flag and stop_flag.is_set():
+                        logger.info("🛑 Señal de detención recibida durante pausa")
+                        break
+                if stop_flag and stop_flag.is_set():
+                    break
+                logger.info("▶️  Radio reanudada")
+            
             iteration += 1
             
             # Verificar si se alcanzó el máximo de iteraciones
@@ -548,7 +581,11 @@ def start_radio(
             # INICIAR GENERACIÓN DEL SIGUIENTE SEGMENTO EN PARALELO
             # Mientras se reproduce el actual, generar el siguiente
             should_generate_next = True
-            if mode == "reader" and reader_segments:
+            
+            # No generar siguiente si hay señal de detención
+            if stop_flag and stop_flag.is_set():
+                should_generate_next = False
+            elif mode == "reader" and reader_segments:
                 # En modo reader, verificar si hay más segmentos
                 should_generate_next = iteration < len(reader_segments)
             elif max_iterations is not None:
@@ -574,9 +611,18 @@ def start_radio(
                 generation_thread = threading.Thread(target=generate_and_store, daemon=True)
                 generation_thread.start()
             
-            # Reproducir audio (mientras el siguiente se genera en paralelo)
+            # Reproducir audio (local o streaming según configuración)
             logger.info("🔊 Reproduciendo segmento...")
-            play_audio(audio, sample_rate=sample_rate)
+            output_audio(
+                audio, 
+                sample_rate=sample_rate,
+                metadata={
+                    "topic": topic,
+                    "text": texto,
+                    "duration": duration_seconds,
+                    "provider": tts_provider
+                }
+            )
             
             # Guardar segmento en historial
             session_history.add_segment(
