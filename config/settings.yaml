@@ -1,0 +1,88 @@
+# settings.yaml
+# Configuración general de la aplicación Radio IA
+# Define parámetros de Ollama, Piper, temas, intervalos, etc.
+
+# Configuración del modelo de lenguaje
+llm:
+  provider: "groq"  # "groq" (rápido, gratis) o "ollama" (local)
+  model_name: "llama-3.3-70b-versatile"  # Para Groq: llama-3.3-70b-versatile, llama-3.1-8b-instant
+  timeout: 30  # Segundos máximos de espera
+  api_key: ""  # API key de Groq (configura tu propia key)
+  max_tokens: 500  # Máximo de tokens a generar
+
+# Configuración de síntesis de voz (TTS)
+tts:
+  # Piper TTS (local, si funciona)
+  model_path: "models/piper/es_ES-davefx-medium.onnx"  # Ruta al modelo de voz
+  speaker_id: null  # ID del hablante (null = por defecto)
+  length_scale: 1.15  # Velocidad: <1.0 más rápido, >1.0 más lento (pausado para ensayos)
+  noise_scale: 0.667  # Variación en entonación
+  noise_w: 0.8  # Variación en duración de fonemas
+  
+  # Edge TTS (Microsoft - voces neuronales)
+  edge_voice: "es-CO-SalomeNeural"  # Voz de España, hombre (ideal para ensayos)
+  # Otras opciones:
+  #  "es-ES-AlvaroNeural"
+  #   es-CO-SalomeNeural (Colombia, mujer)
+  #   es-CO-GonzaloNeural (Colombia, hombre)
+  #   es-MX-DaliaNeural (México, mujer)
+  #   es-ES-ElviraNeural (España, mujer)
+  #   es-AR-ElenaNeural (Argentina, mujer)
+  
+  # Configuración avanzada (nuevo sistema)
+  use_tts_manager: true  # Usar gestor TTS unificado
+  use_cache: true  # Activar caché de audio
+  use_processing: true  # Activar post-procesamiento
+  use_ssml: false  # Usar SSML para control avanzado (puede ralentizar)
+  ssml_style: "standard"  # standard, podcast, audiobook, news, storytelling
+  fallback_chain: ["edge", "piper", "gtts"]  # Orden de fallback
+  
+  # Post-procesamiento
+  processing:
+    normalize: true  # Normalizar volumen
+    target_db: -20.0  # Nivel objetivo en dB
+    compress: true  # Compresión dinámica ligera
+    highpass: true  # Filtro paso-alto (elimina ruido bajo)
+    remove_silence: false  # Eliminar silencios al inicio/final
+
+# Configuración de audio
+audio:
+  sample_rate: 22050  # Frecuencia en Hz (22050 estándar para Piper)
+  channels: 1  # 1=mono, 2=estéreo
+  volume: null  # null=por defecto, 0.0-1.0 para ajustar
+
+# Configuración de la radio
+radio:
+  mode: "monologue"  # "topics" (temas variados), "monologue" (monólogo profundo), o "reader" (leer texto)
+  monologue_theme: "la suerte que es y que se ha estudiado sobre ella segun filosofos, estudiosos cientificos, etc"  # Tema para modo monólogo
+  reader_file: "input/texto.txt"  # Archivo de texto para modo reader
+  duration_seconds: 20  # Duración aproximada de cada segmento (más largo para ensayos)
+  delay_seconds: 3.0  # Pausa entre segmentos (más tiempo para reflexión)
+  max_retries: 3  # Reintentos máximos ante errores
+  skip_intro: false  # true para omitir introducción
+  
+# Personalidad de la locutora
+personality:
+  preset: "educational"  # standard, morning_show, night_talk, comedy, educational
+  energy_level: "bajo"  # alto, medio, bajo, relajado
+  style: "entretenido"  # informativo, entretenido, reflexivo, humorístico
+
+# Temas personalizados (opcional)
+# Si esta lista está vacía, se usarán los temas por defecto
+custom_topics: []
+#  - "tema personalizado 1"
+#  - "tema personalizado 2"
+
+# Historial de sesiones
+history:
+  dir: "history"  # Directorio donde guardar sesiones
+  keep_sessions: 20  # Número de sesiones a mantener (elimina las más antiguas)
+  auto_cleanup: true  # Eliminar sesiones antiguas automáticamente
+  continue_session: true  # Continuar sesión anterior si es reciente
+  session_timeout_hours: 24  # Horas antes de crear nueva sesión
+  max_content_memory: 5  # Número de segmentos a recordar para evitar repetición
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
