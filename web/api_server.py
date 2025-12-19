@@ -36,6 +36,7 @@ from pydantic import BaseModel
 
 # Agregar src/ al path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))  # Agregar web/ al path
 
 from core.radio_loop import start_radio, load_config
 from core.replay import show_session_list, replay_session
@@ -120,6 +121,7 @@ def radio_worker(mode: str, theme: Optional[str], reader_text: Optional[str], sk
     """
     Worker que ejecuta la radio en un thread separado
     """
+    reader_temp_file = None
     try:
         logger.info(f"🎙️ Iniciando radio - Modo: {mode}, Tema: {theme}, Streaming: {enable_streaming}")
         radio_state.status = "running"
@@ -134,28 +136,27 @@ def radio_worker(mode: str, theme: Optional[str], reader_text: Optional[str], sk
         # Configuración
         config = load_config()
         
-        # Actualizar configuración según modo
-        config["mode"] = mode
-        if mode == "monologue" and theme:
-            config["monologue_theme"] = theme
-        elif mode == "reader" and reader_text:
-            # Guardar texto en archivo temporal para reader
+        # Preparar archivo temporal para reader si es necesario
+        if mode == "reader" and reader_text:
             import tempfile
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as f:
                 f.write(reader_text)
-                config["reader_file"] = f.name
-            logger.info(f"📝 Texto de reader guardado temporalmente")
+                reader_temp_file = f.name
+            logger.info(f"📝 Texto de reader guardado temporalmente en {reader_temp_file}")
         
         # Guardar config temporalmente (si es necesario)
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
-        # Iniciar radio con flags de control
+        # Iniciar radio con flags de control y overrides
         start_radio(
             delay_seconds=config.get("delay_seconds", 2.0),
             skip_intro=skip_intro,
             stop_flag=stop_flag,
-            pause_flag=pause_flag
+            pause_flag=pause_flag,
+            mode_override=mode,
+            theme_override=theme,
+            reader_file_override=reader_temp_file
         )
         
     except Exception as e:
@@ -163,6 +164,15 @@ def radio_worker(mode: str, theme: Optional[str], reader_text: Optional[str], sk
         radio_state.status = "stopped"
         radio_state.is_running = False
     finally:
+        # Limpiar archivo temporal si existe
+        if reader_temp_file and Path(reader_temp_file).exists():
+            try:
+                import os
+                os.unlink(reader_temp_file)
+                logger.info(f"🗑️ Archivo temporal de reader eliminado")
+            except Exception as e:
+                logger.warning(f"⚠️ No se pudo eliminar archivo temporal: {e}")
+        
         if enable_streaming:
             stream_manager.stop_streaming()
         radio_state.reset()

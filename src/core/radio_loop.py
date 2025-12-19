@@ -343,7 +343,10 @@ def start_radio(
     max_iterations: Optional[int] = None,
     skip_intro: bool = False,
     stop_flag: Optional[threading.Event] = None,
-    pause_flag: Optional[threading.Event] = None
+    pause_flag: Optional[threading.Event] = None,
+    mode_override: Optional[str] = None,
+    theme_override: Optional[str] = None,
+    reader_file_override: Optional[str] = None
 ) -> None:
     """
     Inicia el bucle principal de Radio IA.
@@ -358,6 +361,9 @@ def start_radio(
         delay_seconds (float): Pausa entre segmentos en segundos (default: 1.0)
         max_iterations (Optional[int]): Número máximo de iteraciones (None = infinito)
         skip_intro (bool): Si True, omite la introducción (default: False)
+        mode_override: Override del modo desde API (topics/monologue/reader)
+        theme_override: Override del tema desde API (para monologue)
+        reader_file_override: Override del archivo de reader desde API
         stop_flag (Optional[threading.Event]): Flag para detener la radio externamente
         pause_flag (Optional[threading.Event]): Flag para pausar la radio externamente
     
@@ -375,6 +381,17 @@ def start_radio(
     
     # Cargar configuración
     config = load_config()
+    
+    # Aplicar overrides de la API si existen
+    if mode_override:
+        config["mode"] = mode_override
+        logger.info(f"🔧 Modo override desde API: {mode_override}")
+    if theme_override:
+        config["monologue_theme"] = theme_override
+        logger.info(f"🔧 Tema override desde API: {theme_override}")
+    if reader_file_override:
+        config["reader_file"] = reader_file_override
+        logger.info(f"🔧 Reader file override desde API: {reader_file_override}")
     
     # Verificar dependencias
     if not check_dependencies(config):
