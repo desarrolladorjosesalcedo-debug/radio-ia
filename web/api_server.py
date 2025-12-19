@@ -100,6 +100,7 @@ radio_state = RadioState()
 class StartRequest(BaseModel):
     mode: str = "topics"  # topics, monologue, reader
     theme: Optional[str] = None
+    reader_text: Optional[str] = None  # Texto para modo reader
     skip_intro: bool = False
     enable_streaming: bool = True  # Por defecto streaming para Render.com
 
@@ -115,7 +116,7 @@ class StatusResponse(BaseModel):
 
 # ========== FUNCIONES DE CONTROL ==========
 
-def radio_worker(mode: str, theme: Optional[str], skip_intro: bool, stop_flag: threading.Event, pause_flag: threading.Event, enable_streaming: bool = False):
+def radio_worker(mode: str, theme: Optional[str], reader_text: Optional[str], skip_intro: bool, stop_flag: threading.Event, pause_flag: threading.Event, enable_streaming: bool = False):
     """
     Worker que ejecuta la radio en un thread separado
     """
@@ -133,12 +134,21 @@ def radio_worker(mode: str, theme: Optional[str], skip_intro: bool, stop_flag: t
         # Configuración
         config = load_config()
         
-        # Actualizar configuración según parámetros
+        # Actualizar configuración según modo
+        config["mode"] = mode
         if mode == "monologue" and theme:
-            # Guardar tema en configuración temporal
-            # (start_radio no acepta tema directamente, se usa de settings.yaml)
-            # Aquí podrías modificar settings.yaml temporalmente o pasar el tema
-            pass
+            config["monologue_theme"] = theme
+        elif mode == "reader" and reader_text:
+            # Guardar texto en archivo temporal para reader
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as f:
+                f.write(reader_text)
+                config["reader_file"] = f.name
+            logger.info(f"📝 Texto de reader guardado temporalmente")
+        
+        # Guardar config temporalmente (si es necesario)
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
         # Iniciar radio con flags de control
         start_radio(
@@ -188,7 +198,8 @@ async def start(request: StartRequest):
             target=radio_worker,
             args=(
                 request.mode, 
-                request.theme, 
+                request.theme,
+                request.reader_text,
                 request.skip_intro, 
                 radio_state.stop_flag, 
                 radio_state.pause_flag,

@@ -21,7 +21,11 @@ const elements = {
     btnStop: document.getElementById('btn-stop'),
     modeTopics: document.getElementById('mode-topics'),
     modeMonologue: document.getElementById('mode-monologue'),
+    modeReader: document.getElementById('mode-reader'),
     inputTheme: document.getElementById('input-theme'),
+    inputReaderText: document.getElementById('input-reader-text'),
+    monologueInput: document.getElementById('monologue-input'),
+    readerInput: document.getElementById('reader-input'),
     statusBadge: document.getElementById('status-badge'),
     currentMode: document.getElementById('current-mode'),
     sessionsContainer: document.getElementById('sessions-container'),
@@ -117,6 +121,14 @@ async function startRadio() {
                 return;
             }
             payload.theme = theme;
+        } else if (state.currentMode === 'reader') {
+            const readerText = elements.inputReaderText.value.trim();
+            if (!readerText) {
+                showToast('Por favor ingresa el texto a leer', 'warning');
+                elements.inputReaderText.focus();
+                return;
+            }
+            payload.reader_text = readerText;
         }
         
         const data = await apiFetch('/start', {
@@ -189,28 +201,30 @@ async function setMode(mode) {
         state.currentMode = mode;
         elements.currentMode.textContent = mode.toUpperCase();
         
-        // Actualizar UI de botones de modo con nueva paleta
-        if (mode === 'topics') {
-            // Topics activo
-            elements.modeTopics.style.backgroundColor = '#415A77';
-            elements.modeTopics.style.borderColor = '#415A77';
-            elements.modeTopics.style.color = '#F5F5F5';
-            // Monologue inactivo
-            elements.modeMonologue.style.backgroundColor = '#415A77';
-            elements.modeMonologue.style.borderColor = '#415A77';
-            elements.modeMonologue.style.color = '#E0E1DD';
-            elements.modeMonologue.style.opacity = '0.7';
+        // Actualizar UI de botones de modo - todos inactivos primero
+        [elements.modeTopics, elements.modeMonologue, elements.modeReader].forEach(btn => {
+            btn.style.backgroundColor = '#415A77';
+            btn.style.borderColor = '#415A77';
+            btn.style.color = '#E0E1DD';
+            btn.style.opacity = '0.7';
+        });
+        
+        // Activar el botón seleccionado
+        const activeBtn = mode === 'topics' ? elements.modeTopics : 
+                         mode === 'monologue' ? elements.modeMonologue : elements.modeReader;
+        activeBtn.style.color = '#F5F5F5';
+        activeBtn.style.opacity = '1';
+        
+        // Mostrar/ocultar inputs según modo
+        if (mode === 'monologue') {
+            elements.monologueInput.classList.remove('hidden');
+            elements.readerInput.classList.add('hidden');
+        } else if (mode === 'reader') {
+            elements.monologueInput.classList.add('hidden');
+            elements.readerInput.classList.remove('hidden');
         } else {
-            // Monologue activo
-            elements.modeMonologue.style.backgroundColor = '#415A77';
-            elements.modeMonologue.style.borderColor = '#415A77';
-            elements.modeMonologue.style.color = '#F5F5F5';
-            elements.modeMonologue.style.opacity = '1';
-            // Topics inactivo
-            elements.modeTopics.style.backgroundColor = '#415A77';
-            elements.modeTopics.style.borderColor = '#415A77';
-            elements.modeTopics.style.color = '#E0E1DD';
-            elements.modeTopics.style.opacity = '0.7';
+            elements.monologueInput.classList.add('hidden');
+            elements.readerInput.classList.add('hidden');
         }
         
         showToast(`Modo cambiado a ${mode.toUpperCase()}`, 'info');
@@ -418,6 +432,7 @@ elements.btnStop.addEventListener('click', stopRadio);
 // Selector de modo
 elements.modeTopics.addEventListener('click', () => setMode('topics'));
 elements.modeMonologue.addEventListener('click', () => setMode('monologue'));
+elements.modeReader.addEventListener('click', () => setMode('reader'));
 
 // Actualizar sesiones
 elements.btnRefreshSessions.addEventListener('click', loadSessions);

@@ -116,18 +116,21 @@
                 <label class="block text-sm font-semibold mb-2" style="color: #415A77;">
                     <i class="fas fa-cog mr-2"></i>Modo de Operación
                 </label>
-                <div class="flex gap-4">
-                    <button id="mode-topics" class="flex-1 font-bold py-3 rounded-lg transition duration-300 border-2" style="background-color: #415A77; color: var(--color-text-primary); border-color: #415A77;">
+                <div class="grid grid-cols-3 gap-4">
+                    <button id="mode-topics" class="font-bold py-3 rounded-lg transition duration-300 border-2" style="background-color: #415A77; color: var(--color-text-primary); border-color: #415A77;">
                         <i class="fas fa-list mr-2"></i>TOPICS
                     </button>
-                    <button id="mode-monologue" class="flex-1 bg-accent font-bold py-3 rounded-lg transition duration-300 border-2 border-accent" style="color: var(--color-text-secondary);">
+                    <button id="mode-monologue" class="bg-accent font-bold py-3 rounded-lg transition duration-300 border-2 border-accent" style="color: var(--color-text-secondary);">
                         <i class="fas fa-microphone mr-2"></i>MONOLOGUE
+                    </button>
+                    <button id="mode-reader" class="bg-accent font-bold py-3 rounded-lg transition duration-300 border-2 border-accent" style="color: var(--color-text-secondary);">
+                        <i class="fas fa-book-open mr-2"></i>READER
                     </button>
                 </div>
             </div>
 
-            <!-- Input de Tema -->
-            <div>
+            <!-- Input de Tema (Monologue) -->
+            <div id="monologue-input" class="mb-6">
                 <label for="input-theme" class="block text-sm font-semibold mb-2" style="color: #415A77;">
                     <i class="fas fa-lightbulb mr-2"></i>Tema del Monólogo
                 </label>
@@ -141,6 +144,24 @@
                 <p class="text-xs mt-2" style="color: var(--color-text-secondary);">
                     <i class="fas fa-info-circle mr-1"></i>
                     Activo solo en modo MONOLOGUE
+                </p>
+            </div>
+
+            <!-- Input de Texto (Reader) -->
+            <div id="reader-input" class="mb-6 hidden">
+                <label for="input-reader-text" class="block text-sm font-semibold mb-2" style="color: #415A77;">
+                    <i class="fas fa-align-left mr-2"></i>Texto a Leer
+                </label>
+                <textarea 
+                    id="input-reader-text" 
+                    placeholder="Pega o escribe el texto que quieres que la radio lea..." 
+                    rows="6"
+                    class="w-full bg-accent px-4 py-3 rounded-lg focus:outline-none focus:ring-2 resize-y"
+                    style="color: var(--color-text-primary); border: 1px solid #415A77;"
+                ></textarea>
+                <p class="text-xs mt-2" style="color: var(--color-text-secondary);">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    La radio leerá este texto dividido en segmentos
                 </p>
             </div>
         </div>
