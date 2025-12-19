@@ -65,7 +65,7 @@ def output_audio(audio_bytes: bytes, sample_rate: int = 22050, metadata: dict = 
 
 def _convert_to_mp3(raw_audio: bytes, sample_rate: int) -> bytes:
     """
-    Convierte audio RAW PCM a MP3
+    Convierte audio RAW PCM a MP3 usando pydub
     
     Args:
         raw_audio: Audio en formato RAW PCM (16-bit signed little-endian, mono)
@@ -74,53 +74,33 @@ def _convert_to_mp3(raw_audio: bytes, sample_rate: int) -> bytes:
     Returns:
         bytes: Audio en formato MP3, o bytes vacíos si falla
     """
-    import subprocess
-    import tempfile
-    import os
-    
     try:
-        # Crear archivos temporales
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.raw') as raw_file:
-            raw_file.write(raw_audio)
-            raw_path = raw_file.name
+        from pydub import AudioSegment
+        from io import BytesIO
         
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as mp3_file:
-            mp3_path = mp3_file.name
+        # Crear AudioSegment desde raw PCM
+        audio_segment = AudioSegment(
+            data=raw_audio,
+            sample_width=2,      # 16-bit = 2 bytes
+            frame_rate=sample_rate,
+            channels=1           # mono
+        )
         
-        try:
-            # Convertir RAW PCM a MP3 con ffmpeg
-            result = subprocess.run(
-                [
-                    'ffmpeg',
-                    '-f', 's16le',              # input format: signed 16-bit little-endian
-                    '-ar', str(sample_rate),    # sample rate
-                    '-ac', '1',                 # mono
-                    '-i', raw_path,             # input file
-                    '-codec:a', 'libmp3lame',   # MP3 encoder
-                    '-b:a', '128k',             # bitrate
-                    '-y',                       # overwrite output
-                    mp3_path
-                ],
-                capture_output=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                with open(mp3_path, 'rb') as f:
-                    mp3_data = f.read()
-                logger.info(f"✅ Convertido a MP3: {len(raw_audio)} → {len(mp3_data)} bytes")
-                return mp3_data
-            else:
-                logger.error(f"❌ ffmpeg falló: {result.stderr.decode('utf-8', errors='ignore')}")
-                return b""
+        # Exportar a MP3
+        mp3_buffer = BytesIO()
+        audio_segment.export(
+            mp3_buffer,
+            format='mp3',
+            bitrate='128k'
+        )
         
-        finally:
-            # Limpiar archivos temporales
-            if os.path.exists(raw_path):
-                os.unlink(raw_path)
-            if os.path.exists(mp3_path):
-                os.unlink(mp3_path)
-    
+        mp3_data = mp3_buffer.getvalue()
+        logger.info(f"✅ Convertido a MP3: {len(raw_audio)} → {len(mp3_data)} bytes")
+        return mp3_data
+        
+    except ImportError:
+        logger.error("❌ pydub no está instalado. Instala con: pip install pydub")
+        return b""
     except Exception as e:
         logger.error(f"❌ Error convirtiendo a MP3: {e}")
         return b""

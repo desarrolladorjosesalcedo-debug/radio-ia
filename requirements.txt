@@ -14,6 +14,10 @@ psutil>=5.9.0
 # Logging mejorado (opcional)
 colorlog>=6.7.0
 
+# Audio processing
+numpy>=1.24.0            # Procesamiento de audio
+pydub>=0.25.1            # Conversión de formatos de audio
+
 # Text-to-Speech (TTS)
 gtts>=2.5.0              # Google TTS (fallback)
 edge-tts>=7.0.0          # Microsoft Edge TTS (recomendado - voces neuronales)
