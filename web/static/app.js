@@ -1,8 +1,8 @@
 // app.js - Frontend JavaScript para Radio IA
 // Maneja la lógica de la interfaz y comunicación con el backend
 
-// Configuración
-const API_BASE_URL = 'http://localhost:8000/api';
+// Configuración - Detectar automáticamente el host (local o Render)
+const API_BASE_URL = window.location.origin + '/api';
 let pollingInterval = null;
 
 // Estado de la aplicación
