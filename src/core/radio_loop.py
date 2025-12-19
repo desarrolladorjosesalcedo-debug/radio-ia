@@ -653,6 +653,11 @@ def start_radio(
                 stop_flag=_stop_flag
             )
             
+            # Verificar si se solicitó detención durante la reproducción
+            if stop_flag and stop_flag.is_set():
+                logger.info("⏹️  Detención solicitada - finalizando bucle")
+                break
+            
             # Guardar segmento en historial
             session_history.add_segment(
                 topic=topic,
@@ -670,6 +675,11 @@ def start_radio(
             
             logger.info(f"✅ Segmento #{iteration} completado exitosamente")
             
+            # Verificar si se solicitó detención antes de la pausa
+            if stop_flag and stop_flag.is_set():
+                logger.info("⏹️  Detención solicitada - finalizando bucle")
+                break
+            
             # Pausa mínima (el siguiente segmento ya debería estar listo)
             if delay_seconds > 0:
                 if generation_thread and generation_thread.is_alive():
@@ -677,6 +687,11 @@ def start_radio(
                 else:
                     logger.info(f"⚡ Siguiente segmento ya listo - sin pausa")
                 time.sleep(delay_seconds)
+            
+            # Verificar detención después de la pausa
+            if stop_flag and stop_flag.is_set():
+                logger.info("⏹️  Detención solicitada - finalizando bucle")
+                break
         
         except KeyboardInterrupt:
             logger.info("\n" + "=" * 60)
