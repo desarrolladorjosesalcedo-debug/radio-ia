@@ -173,6 +173,10 @@ async def start(request: StartRequest):
         raise HTTPException(status_code=400, detail="Ya hay una transmisión en curso. Deténla primero.")
     
     try:
+        # Limpiar flags antes de iniciar (por si quedaron activos de ejecuciones anteriores)
+        radio_state.stop_flag.clear()
+        radio_state.pause_flag.clear()
+        
         # Actualizar estado
         radio_state.current_mode = request.mode
         radio_state.current_theme = request.theme or ""
@@ -406,6 +410,10 @@ async def play_session_endpoint(session_id: str):
         session_path = Path(history_dir) / f"session_{session_id}.json"
         if not session_path.exists():
             raise HTTPException(status_code=404, detail=f"Sesión {session_id} no encontrada")
+        
+        # Limpiar flags antes de iniciar (por si quedaron activos de ejecuciones anteriores)
+        radio_state.stop_flag.clear()
+        radio_state.pause_flag.clear()
         
         # Actualizar estado - ahora es una reproducción activa
         radio_state.is_running = True

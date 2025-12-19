@@ -27,7 +27,7 @@ def set_output_mode(mode: str, stream_manager=None):
     logger.info(f"🔊 Modo de salida configurado: {mode}")
 
 
-def output_audio(audio_bytes: bytes, sample_rate: int = 22050, metadata: dict = None) -> bool:
+def output_audio(audio_bytes: bytes, sample_rate: int = 22050, metadata: dict = None, stop_flag=None) -> bool:
     """
     Envía audio a la salida configurada (local o streaming)
     
@@ -35,6 +35,7 @@ def output_audio(audio_bytes: bytes, sample_rate: int = 22050, metadata: dict = 
         audio_bytes: Audio en bytes (RAW PCM)
         sample_rate: Frecuencia de muestreo
         metadata: Metadata del segmento (tema, duración, etc.)
+        stop_flag: threading.Event para detener reproducción inmediatamente
     
     Returns:
         bool: True si se envió correctamente
@@ -55,7 +56,7 @@ def output_audio(audio_bytes: bytes, sample_rate: int = 22050, metadata: dict = 
     else:  # local
         try:
             from utils.audio_player import play_audio
-            play_audio(audio_bytes, sample_rate=sample_rate)
+            play_audio(audio_bytes, sample_rate=sample_rate, stop_flag=stop_flag)
             return True
         except Exception as e:
             logger.error(f"❌ Error reproduciendo localmente: {e}")

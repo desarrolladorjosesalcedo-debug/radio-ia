@@ -105,7 +105,7 @@ async function startRadio() {
     try {
         const payload = {
             mode: state.currentMode,
-            enable_streaming: true,  // Habilitar streaming por defecto
+            enable_streaming: false,  // false = reproducción local con ffplay, true = streaming web
             skip_intro: true         // Saltar introducción automáticamente
         };
         
@@ -276,9 +276,9 @@ function updateUIState(status) {
             style: 'background-color: #415A77; color: #F5F5F5;',
             buttons: {
                 start: true,
-                pause: false,
+                pause: false,  // Habilitar pausa durante reproducción de sesiones
                 resume: true,
-                stop: false
+                stop: false  // false = enabled (poder detener la sesión)
             }
         }
     };
@@ -359,6 +359,9 @@ async function playSession(sessionId) {
         const data = await apiFetch(`/play_session/${sessionId}`, { method: 'POST' });
         showToast(data.message || `Reproduciendo sesión ${sessionId}`, 'success');
         
+        // Mostrar reproductor de audio
+        showAudioPlayer();
+        
         // Actualizar UI para mostrar que está reproduciendo
         updateUIState('playing');
         startStatusPolling();
@@ -381,6 +384,12 @@ function startStatusPolling() {
             
             if (data.status) {
                 updateUIState(data.status);
+                
+                // Detener polling y ocultar reproductor si la radio se detiene
+                if (data.status === 'stopped' && !data.is_running) {
+                    hideAudioPlayer();
+                    stopStatusPolling();
+                }
             }
         } catch (error) {
             console.error('Error en polling:', error);

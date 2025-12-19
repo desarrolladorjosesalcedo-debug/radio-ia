@@ -33,7 +33,8 @@ def play_audio(
     audio_data: bytes,
     sample_rate: int = 22050,
     channels: int = 1,
-    volume: Optional[float] = None
+    volume: Optional[float] = None,
+    stop_flag = None
 ) -> None:
     """
     Reproduce audio RAW PCM generado por Piper usando ffplay.
@@ -43,6 +44,7 @@ def play_audio(
         sample_rate (int): Frecuencia de muestreo en Hz (default: 22050)
         channels (int): Número de canales (1=mono, 2=estéreo) (default: 1)
         volume (Optional[float]): Volumen (0.0 a 1.0). None = volumen por defecto
+        stop_flag: threading.Event para detener la reproducción inmediatamente
     
     Returns:
         None
@@ -103,7 +105,16 @@ def play_audio(
         
         # Esperar a que termine la reproducción
         try:
-            return_code = process.wait(timeout=30)
+            # Polling para poder interrumpir si se activa stop_flag
+            import time
+            while process.poll() is None:  # Mientras el proceso siga corriendo
+                if stop_flag and stop_flag.is_set():
+                    logger.info("🛑 Reproducción interrumpida por stop_flag")
+                    process.kill()
+                    return
+                time.sleep(0.1)  # Check cada 100ms
+            
+            return_code = process.returncode
         except subprocess.TimeoutExpired:
             logger.warning("⚠️  Timeout esperando fin de reproducción")
             process.kill()

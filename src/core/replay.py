@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 def replay_session(
     session_id: str,
     delay_seconds: float = 2.0,
-    history_dir: str = "history"
+    history_dir: str = "history",
+    stop_flag = None,
+    pause_flag = None
 ) -> bool:
     """
     Reproduce una sesión guardada sin pausas largas.
@@ -30,6 +32,8 @@ def replay_session(
         session_id: ID de la sesión a reproducir
         delay_seconds: Pausa breve entre segmentos (default: 2s)
         history_dir: Directorio de historial
+        stop_flag: threading.Event para detener la reproducción
+        pause_flag: threading.Event para pausar la reproducción
         
     Returns:
         True si se reprodujo exitosamente, False si hubo errores
@@ -72,7 +76,7 @@ def replay_session(
             )
             
             if intro_audio:
-                play_audio(intro_audio, sample_rate=sample_rate)
+                play_audio(intro_audio, sample_rate=sample_rate, stop_flag=stop_flag)
                 logger.info("✅ Introducción reproducida")
                 time.sleep(delay_seconds)
             else:
@@ -111,7 +115,7 @@ def replay_session(
             
             # Reproducir sin pausa larga
             logger.info("🔊 Reproduciendo...")
-            play_audio(audio, sample_rate=sample_rate)
+            play_audio(audio, sample_rate=sample_rate, stop_flag=stop_flag)
             logger.info(f"✅ Segmento #{i} completado")
             
             # Pausa breve entre segmentos

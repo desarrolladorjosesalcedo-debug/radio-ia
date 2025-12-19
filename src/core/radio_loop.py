@@ -84,11 +84,18 @@ def load_config() -> dict:
         with open(settings_path, 'r', encoding='utf-8') as f:
             settings = yaml.safe_load(f)
         
+        # Obtener ruta base del proyecto (donde está la carpeta config)
+        project_root = settings_path.parent.parent
+        
         # Mapear configuración de YAML a formato interno
+        model_path_raw = settings.get("tts", {}).get("model_path", DEFAULT_CONFIG["model_path"])
+        # Convertir ruta relativa a absoluta
+        model_path = str(project_root / model_path_raw)
+        
         config = {
             "provider": settings.get("llm", {}).get("provider", DEFAULT_CONFIG["provider"]),
             "model_name": settings.get("llm", {}).get("model_name", DEFAULT_CONFIG["model_name"]),
-            "model_path": settings.get("tts", {}).get("model_path", DEFAULT_CONFIG["model_path"]),
+            "model_path": model_path,
             "duration_seconds": settings.get("radio", {}).get("duration_seconds", DEFAULT_CONFIG["duration_seconds"]),
             "delay_seconds": settings.get("radio", {}).get("delay_seconds", DEFAULT_CONFIG["delay_seconds"]),
             "sample_rate": settings.get("audio", {}).get("sample_rate", DEFAULT_CONFIG["sample_rate"]),
@@ -271,13 +278,14 @@ def generate_segment(
     return texto, audio, topic, tts_provider
 
 
-def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key: str = "", max_tokens: int = 200, edge_voice: str = "es-CO-SalomeNeural") -> Optional[str]:
+def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key: str = "", max_tokens: int = 200, edge_voice: str = "es-CO-SalomeNeural", stop_flag=None) -> Optional[str]:
     """
     Reproduce una introducción de bienvenida a la radio.
     
     Args:
         model_name (str): Nombre del modelo de Ollama
         model_path (str): Ruta al modelo de Piper
+        stop_flag: threading.Event para detener reproducción
     
     Returns:
         Optional[str]: Texto de la introducción generada, o None si falla
@@ -304,7 +312,7 @@ def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key
                 intro_audio = synthesize_speech_gtts(intro_text)
             
             if intro_audio:
-                play_audio(intro_audio)
+                play_audio(intro_audio, stop_flag=stop_flag)
                 logger.info("✅ Introducción reproducida")
                 return intro_text
         
@@ -440,7 +448,7 @@ def start_radio(
     
     # Reproducir introducción
     if not skip_intro:
-        intro_text = play_intro(model_name, model_path, provider=provider, api_key=api_key, max_tokens=200, edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"))
+        intro_text = play_intro(model_name, model_path, provider=provider, api_key=api_key, max_tokens=200, edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"), stop_flag=_stop_flag)
         if intro_text:
             session_history.add_intro(intro_text, config.get("edge_voice", "es-CO-SalomeNeural"), 15.0)
         time.sleep(delay_seconds)
@@ -621,7 +629,8 @@ def start_radio(
                     "text": texto,
                     "duration": duration_seconds,
                     "provider": tts_provider
-                }
+                },
+                stop_flag=_stop_flag
             )
             
             # Guardar segmento en historial
