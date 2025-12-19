@@ -105,7 +105,7 @@ async function startRadio() {
     try {
         const payload = {
             mode: state.currentMode,
-            enable_streaming: false,  // false = reproducción local con ffplay, true = streaming web
+            enable_streaming: true,  // true = streaming web (necesario para Render.com)
             skip_intro: true         // Saltar introducción automáticamente
         };
         

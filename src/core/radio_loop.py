@@ -81,6 +81,7 @@ def load_config() -> dict:
         return DEFAULT_CONFIG.copy()
     
     try:
+        import os
         with open(settings_path, 'r', encoding='utf-8') as f:
             settings = yaml.safe_load(f)
         
@@ -91,6 +92,9 @@ def load_config() -> dict:
         model_path_raw = settings.get("tts", {}).get("model_path", DEFAULT_CONFIG["model_path"])
         # Convertir ruta relativa a absoluta
         model_path = str(project_root / model_path_raw)
+        
+        # Obtener API key: primero desde variable de entorno, luego desde settings.yaml
+        api_key = os.getenv("GROQ_API_KEY") or settings.get("llm", {}).get("api_key", "")
         
         config = {
             "provider": settings.get("llm", {}).get("provider", DEFAULT_CONFIG["provider"]),
@@ -108,7 +112,7 @@ def load_config() -> dict:
             "tts_length_scale": settings.get("tts", {}).get("length_scale", 1.0),
             "edge_voice": settings.get("tts", {}).get("edge_voice", "es-CO-SalomeNeural"),
             "llm_timeout": settings.get("llm", {}).get("timeout", 30),
-            "api_key": settings.get("llm", {}).get("api_key", ""),
+            "api_key": api_key,
             "max_tokens": settings.get("llm", {}).get("max_tokens", 500),
             "history_dir": settings.get("history", {}).get("dir", "history"),
             "continue_session": settings.get("history", {}).get("continue_session", True),
@@ -135,9 +139,11 @@ def check_dependencies(config: dict) -> bool:
     Returns:
         bool: True si todas las dependencias están disponibles
     """
+    import os
     logger.info("🔍 Verificando dependencias...")
     
     all_available = True
+    is_cloud = os.getenv('RENDER') or os.getenv('RAILWAY_ENVIRONMENT')  # Detectar entorno cloud
     provider = config.get("provider", "ollama")
     
     # Verificar LLM según provider
@@ -158,20 +164,29 @@ def check_dependencies(config: dict) -> bool:
             logger.info("💡 Instala Ollama desde: https://ollama.ai/")
             all_available = False
     
-    # Verificar Piper
+    # Verificar Piper (opcional en cloud, usa Edge TTS como fallback)
     if not check_piper_available():
-        logger.error("❌ Piper TTS no está disponible")
-        logger.info("💡 Instala Piper desde: https://github.com/rhasspy/piper")
-        all_available = False
+        if is_cloud:
+            logger.warning("⚠️  Piper TTS no disponible (cloud) - usando Edge TTS")
+        else:
+            logger.error("❌ Piper TTS no está disponible")
+            logger.info("💡 Instala Piper desde: https://github.com/rhasspy/piper")
+            all_available = False
     
-    # Verificar ffplay
+    # Verificar ffplay (opcional en cloud, se usa streaming)
     if not check_ffplay_available():
-        logger.error("❌ ffplay no está disponible")
-        logger.info("💡 Instala FFmpeg desde: https://ffmpeg.org/")
-        all_available = False
+        if is_cloud:
+            logger.warning("⚠️  ffplay no disponible (cloud) - usando modo streaming")
+        else:
+            logger.error("❌ ffplay no está disponible")
+            logger.info("💡 Instala FFmpeg desde: https://ffmpeg.org/")
+            all_available = False
     
     if all_available:
         logger.info("✅ Todas las dependencias están disponibles")
+    elif is_cloud:
+        logger.info("✅ Dependencias cloud OK (Edge TTS + Streaming)")
+        all_available = True  # En cloud es OK sin ffplay/piper
     
     return all_available
 
@@ -378,12 +393,17 @@ def start_radio(
     mode = config.get("mode", "topics")
     monologue_theme = config.get("monologue_theme", "inteligencia artificial")
     
-    # Validar modelo de Piper
+    # Validar modelo de Piper (opcional en cloud)
+    import os
+    is_cloud = os.getenv('RENDER') or os.getenv('RAILWAY_ENVIRONMENT')
     if not Path(model_path).exists():
-        logger.error(f"❌ Modelo de Piper no encontrado: {model_path}")
-        logger.info("💡 Descarga un modelo de voz y colócalo en models/piper/")
-        logger.info("   Modelos disponibles en: https://github.com/rhasspy/piper/releases")
-        return
+        if is_cloud:
+            logger.warning(f"⚠️  Modelo de Piper no encontrado (cloud) - usando Edge TTS")
+        else:
+            logger.error(f"❌ Modelo de Piper no encontrado: {model_path}")
+            logger.info("💡 Descarga un modelo de voz y colócalo en models/piper/")
+            logger.info("   Modelos disponibles en: https://github.com/rhasspy/piper/releases")
+            return
     
     # Cargar segmentos en modo reader
     reader_segments = None

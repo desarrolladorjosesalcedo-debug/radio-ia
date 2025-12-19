@@ -4,6 +4,10 @@
 
 Radio IA es una aplicación que genera y transmite contenido de radio de forma continua utilizando modelos de IA. Genera texto con LLM y sintetiza voz con calidad profesional.
 
+## 🌐 Deploy en Cloud
+
+**¿Quieres desplegarlo en la nube?** Ve a la rama [`render-deployment`](../../tree/render-deployment) y sigue las instrucciones en [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) para deployment en Render.com (gratis).
+
 ## ✨ Características
 
 - 🤖 **Contenido generado por IA**: Groq API (ultra-rápido) o Ollama (local)
