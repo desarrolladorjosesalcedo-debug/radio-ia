@@ -11,4 +11,10 @@ services:
         value: 3.11.0
       - key: PYTHONUNBUFFERED
         value: 1
+      - key: RENDER
+        value: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
     healthCheckPath: /api/status

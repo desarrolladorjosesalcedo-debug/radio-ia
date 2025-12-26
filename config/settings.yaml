@@ -7,7 +7,7 @@ llm:
   provider: "groq"  # "groq" (rápido, gratis) o "ollama" (local)
   model_name: "llama-3.3-70b-versatile"  # Para Groq: llama-3.3-70b-versatile, llama-3.1-8b-instant
   timeout: 30  # Segundos máximos de espera
-  api_key: ""  # API key de Groq (configura tu propia key)
+  api_key: ""  # API key de Groq (configura GROQ_API_KEY como variable de entorno)
   max_tokens: 500  # Máximo de tokens a generar
 
 # Configuración de síntesis de voz (TTS)
@@ -28,6 +28,15 @@ tts:
   #   es-MX-DaliaNeural (México, mujer)
   #   es-ES-ElviraNeural (España, mujer)
   #   es-AR-ElenaNeural (Argentina, mujer)
+  
+  # ElevenLabs TTS (voces ultrarrealistas - requiere API key)
+  elevenlabs_voice_id: "pNInz6obpgDQGcFmaJgB"  # Adam - voz masculina clara (multilingüe)
+  elevenlabs_model_id: "eleven_multilingual_v2"  # Modelo multilingüe v2 (soporta español)
+  # Otras voces populares:
+  #   "21m00Tcm4TlvDq8ikWAM" - Rachel (femenina suave)
+  #   "JBFqnCBsd6RMkjVDRZzb" - George (masculina profunda)
+  #   "EXAVITQu4vr4xnSDxMaL" - Sarah (femenina joven)
+  #   "onwK4e9ZLuTAKqWW03F9" - Daniel (masculina madura)
   
   # Configuración avanzada (nuevo sistema)
   use_tts_manager: true  # Usar gestor TTS unificado
@@ -54,7 +63,7 @@ audio:
 # Configuración de la radio
 radio:
   mode: "monologue"  # "topics" (temas variados), "monologue" (monólogo profundo), o "reader" (leer texto)
-  monologue_theme: "la suerte que es y que se ha estudiado sobre ella segun filosofos, estudiosos cientificos, etc"  # Tema para modo monólogo
+  monologue_theme: "las matematicas, su historia y aplicaciones y su impacto en la ciencia y la tecnología ademas de su relevancia en la vida cotidiana"  # Tema para modo monólogo
   reader_file: "input/texto.txt"  # Archivo de texto para modo reader
   duration_seconds: 20  # Duración aproximada de cada segmento (más largo para ensayos)
   delay_seconds: 3.0  # Pausa entre segmentos (más tiempo para reflexión)

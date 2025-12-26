@@ -17,6 +17,7 @@ colorlog>=6.7.0
 # Text-to-Speech (TTS)
 gtts>=2.5.0              # Google TTS (fallback)
 edge-tts>=7.0.0          # Microsoft Edge TTS (recomendado - voces neuronales)
+elevenlabs>=1.0.0        # ElevenLabs TTS (voces ultrarrealistas - requiere API key)
 
 # Servidor Web API (para interfaz web)
 fastapi>=0.104.0         # Framework API REST moderno

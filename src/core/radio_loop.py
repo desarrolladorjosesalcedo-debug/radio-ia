@@ -36,6 +36,7 @@ from llm.groq_client import generate_text_groq, check_groq_available
 from tts.piper_tts import synthesize_speech, check_piper_available, validate_model
 from tts.edge_tts_client import synthesize_speech_edge, check_edge_tts_available
 from tts.gtts_client import synthesize_speech_gtts, check_gtts_available
+from tts.elevenlabs_tts import synthesize_speech_elevenlabs, check_elevenlabs_available
 from utils.audio_player import play_audio, check_ffplay_available
 from utils.audio_output import output_audio
 
@@ -107,6 +108,9 @@ def load_config() -> dict:
             "tts_speaker_id": settings.get("tts", {}).get("speaker_id"),
             "tts_length_scale": settings.get("tts", {}).get("length_scale", 1.0),
             "edge_voice": settings.get("tts", {}).get("edge_voice", "es-CO-SalomeNeural"),
+            "elevenlabs_voice_id": settings.get("tts", {}).get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB"),
+            "elevenlabs_model_id": settings.get("tts", {}).get("elevenlabs_model_id", "eleven_multilingual_v2"),
+            "elevenlabs_api_key": os.getenv("ELEVENLABS_API_KEY") or settings.get("tts", {}).get("elevenlabs_api_key", ""),
             "llm_timeout": settings.get("llm", {}).get("timeout", 30),
             "api_key": settings.get("llm", {}).get("api_key", ""),
             "max_tokens": settings.get("llm", {}).get("max_tokens", 500),
@@ -186,6 +190,9 @@ def generate_segment(
     max_tokens: int = 500,
     llm_timeout: int = 30,
     edge_voice: str = "es-CO-SalomeNeural",
+    elevenlabs_voice_id: str = "pNInz6obpgDQGcFmaJgB",
+    elevenlabs_model_id: str = "eleven_multilingual_v2",
+    elevenlabs_api_key: str = "",
     mode: str = "topics",
     previous_content: Optional[str] = None,
     reader_text: Optional[str] = None,
@@ -252,14 +259,29 @@ def generate_segment(
     
     logger.info(f"✅ Texto generado ({len(texto)} caracteres)")
     
-    # Paso 4: Convertir texto a voz (Piper → Edge TTS → Google TTS)
+    # Paso 4: Convertir texto a voz con fallback chain
+    # Orden: Piper → ElevenLabs → Edge TTS → Google TTS
     logger.info("🎤 Sintetizando voz...")
     audio = synthesize_speech(texto, model_path, length_scale=duration_seconds/20.0)
     tts_provider = "piper"
     
-    # Si Piper falla, intentar con Edge TTS (mejor calidad)
+    # Si Piper falla, intentar con ElevenLabs (voces ultrarrealistas)
     if not audio or len(audio) < 100:
-        logger.warning("⚠️  Piper falló, intentando con Edge TTS...")
+        if elevenlabs_api_key:
+            logger.warning("⚠️  Piper falló, intentando con ElevenLabs...")
+            audio = synthesize_speech_elevenlabs(
+                texto, 
+                voice_id=elevenlabs_voice_id,
+                model_id=elevenlabs_model_id,
+                api_key=elevenlabs_api_key
+            )
+            tts_provider = "elevenlabs"
+        else:
+            logger.warning("⚠️  Piper falló, ElevenLabs no disponible (sin API key)")
+    
+    # Si ElevenLabs falla, intentar con Edge TTS (voces neuronales)
+    if not audio or len(audio) < 100:
+        logger.warning("⚠️  Intentando con Edge TTS...")
         audio = synthesize_speech_edge(texto, voice=edge_voice)
         tts_provider = "edge"
     
@@ -273,12 +295,23 @@ def generate_segment(
         logger.warning("⚠️  Audio generado inválido o vacío")
         return texto, b"", topic, "none"
     
-    logger.info(f"✅ Audio sintetizado ({len(audio)} bytes)")
+    logger.info(f"✅ Audio sintetizado con {tts_provider.upper()} ({len(audio)} bytes)")
     
     return texto, audio, topic, tts_provider
 
 
-def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key: str = "", max_tokens: int = 200, edge_voice: str = "es-CO-SalomeNeural", stop_flag=None) -> Optional[str]:
+def play_intro(
+    model_name: str, 
+    model_path: str, 
+    provider: str = "groq", 
+    api_key: str = "", 
+    max_tokens: int = 200, 
+    edge_voice: str = "es-CO-SalomeNeural",
+    elevenlabs_voice_id: str = "pNInz6obpgDQGcFmaJgB",
+    elevenlabs_model_id: str = "eleven_multilingual_v2",
+    elevenlabs_api_key: str = "",
+    stop_flag=None
+) -> Optional[str]:
     """
     Reproduce una introducción de bienvenida a la radio.
     
@@ -302,9 +335,19 @@ def play_intro(model_name: str, model_path: str, provider: str = "groq", api_key
         
         if intro_text:
             intro_audio = synthesize_speech(intro_text, model_path)
-            # Si Piper falla, intentar con Edge TTS
+            # Si Piper falla, intentar con ElevenLabs
             if not intro_audio or len(intro_audio) < 100:
-                logger.warning("⚠️  Piper falló, usando Edge TTS para intro...")
+                if elevenlabs_api_key:
+                    logger.warning("⚠️  Piper falló, usando ElevenLabs para intro...")
+                    intro_audio = synthesize_speech_elevenlabs(
+                        intro_text,
+                        voice_id=elevenlabs_voice_id,
+                        model_id=elevenlabs_model_id,
+                        api_key=elevenlabs_api_key
+                    )
+            # Si ElevenLabs falla, intentar con Edge TTS
+            if not intro_audio or len(intro_audio) < 100:
+                logger.warning("⚠️  Usando Edge TTS para intro...")
                 intro_audio = synthesize_speech_edge(intro_text, voice=edge_voice)
             # Si Edge TTS falla, usar Google TTS
             if not intro_audio or len(intro_audio) < 100:
@@ -448,7 +491,18 @@ def start_radio(
     
     # Reproducir introducción
     if not skip_intro:
-        intro_text = play_intro(model_name, model_path, provider=provider, api_key=api_key, max_tokens=200, edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"), stop_flag=_stop_flag)
+        intro_text = play_intro(
+            model_name, 
+            model_path, 
+            provider=provider, 
+            api_key=api_key, 
+            max_tokens=200, 
+            edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"),
+            elevenlabs_voice_id=config.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB"),
+            elevenlabs_model_id=config.get("elevenlabs_model_id", "eleven_multilingual_v2"),
+            elevenlabs_api_key=config.get("elevenlabs_api_key", ""),
+            stop_flag=_stop_flag
+        )
         if intro_text:
             session_history.add_intro(intro_text, config.get("edge_voice", "es-CO-SalomeNeural"), 15.0)
         time.sleep(delay_seconds)
@@ -487,6 +541,9 @@ def start_radio(
             max_tokens=max_tokens,
             llm_timeout=config.get("llm_timeout", 30),
             edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"),
+            elevenlabs_voice_id=config.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB"),
+            elevenlabs_model_id=config.get("elevenlabs_model_id", "eleven_multilingual_v2"),
+            elevenlabs_api_key=config.get("elevenlabs_api_key", ""),
             mode=mode,
             previous_content=prev_content,
             reader_text=segment_text,
@@ -554,6 +611,9 @@ def start_radio(
                     max_tokens=max_tokens,
                     llm_timeout=config.get("llm_timeout", 30),
                     edge_voice=config.get("edge_voice", "es-CO-SalomeNeural"),
+                    elevenlabs_voice_id=config.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB"),
+                    elevenlabs_model_id=config.get("elevenlabs_model_id", "eleven_multilingual_v2"),
+                    elevenlabs_api_key=config.get("elevenlabs_api_key", ""),
                     mode=mode,
                     previous_content=previous_content,
                     reader_text=segment_text,
